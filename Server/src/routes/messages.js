@@ -1,50 +1,32 @@
-import { Router } from 'express';
-import { db, Timestamp } from '../config/firebase.js';
-import { requireAuth } from '../middleware/auth.js';
-import { chatMessageSchema } from '../utils/validate.js';
+import express from 'express';
+import { hasMembership, listMessages, addMessage } from '../store.js';
 
-const router = Router();
+const router = express.Router({ mergeParams: true });
 
-/** List last 100 messages for a request */
-// messages.js (secure)
-router.get('/:requestId', requireAuth, async (req, res) => {
-  const reqRef = db.collection('requests').doc(req.params.requestId);
-  const doc = await reqRef.get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
-
-  const isOwner = doc.data().uid === req.user.uid;
-  const joined = await reqRef.collection('joinedUsers').doc(req.user.uid).get();
-  if (!isOwner && !joined.exists) return res.status(403).json({ error: 'Not a member' });
-
-  const snap = await reqRef.collection('messages')
-    .orderBy('timestamp', 'desc')
-    .limit(100)
-    .get();
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
-  res.json(list);
+// GET /api/messages/:requestId — list messages
+router.get('/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  // Match the UI: require join before viewing chat
+  if (!hasMembership(requestId, req.user?.uid || 'anon')) {
+    return res.status(403).json({ error: 'Join required to view messages' });
+  }
+  res.json(listMessages(requestId));
 });
 
-/** Post a message (must be owner or joined member) */
-router.post('/:requestId', requireAuth, async (req, res) => {
-  const { error, value } = chatMessageSchema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.message });
-
-  const reqRef = db.collection('requests').doc(req.params.requestId);
-  const doc = await reqRef.get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
-
-  const isOwner = doc.data().uid === req.user.uid;
-  const joined = await reqRef.collection('joinedUsers').doc(req.user.uid).get();
-  if (!isOwner && !joined.exists) return res.status(403).json({ error: 'Not a member' });
-
-  const payload = {
-    uid: req.user.uid,
-    displayName: req.user.name || 'User',
-    text: value.text,
-    timestamp: Timestamp.now()
-  };
-  const msgRef = await reqRef.collection('messages').add(payload);
-  res.json({ id: msgRef.id, ...payload });
+// POST /api/messages/:requestId — send message
+router.post('/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  const { text } = req.body || {};
+  if (!text || !text.trim()) return res.status(400).json({ error: 'text is required' });
+  if (!hasMembership(requestId, req.user?.uid || 'anon')) {
+    return res.status(403).json({ error: 'Join required to chat' });
+  }
+  const m = addMessage(requestId, {
+    uid: req.user?.uid || 'anon',
+    displayName: req.user?.displayName || 'User',
+    text
+  });
+  res.json(m);
 });
 
 export default router;
