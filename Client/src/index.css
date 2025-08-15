@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Optional: Add your theme customizations directly */
+@theme {
+  --font-display: "Inter", sans-serif;
+  --color-primary: #4f46e5;
+}
