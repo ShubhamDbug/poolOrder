@@ -6,6 +6,7 @@ import {
   ensureMembership,
   removeMembership,
   deleteRequest,
+  hasMembership,  
   listNearby
 } from '../store-firestore.js';
 import { haversineMeters } from '../utils/distance.js';
@@ -69,7 +70,32 @@ router.post('/:id/leave', async (req, res) => {
     res.status(500).json({ error: e.message || 'Failed to leave' });
   }
 });
+router.get('/:id/membership', async (req, res) => {
+  try {
+    const uid = req.user?.uid || null;      // if not signed in → false
+    if (!uid) return res.json({ joined: false });
 
+    const joined = await hasMembership(req.params.id, uid);
+    res.json({ joined });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to check membership' });
+  }
+});
+
+/** GET /api/requests/:id/memberships/self
+ *  Fallback endpoint for older clients; same response shape.
+ */
+router.get('/:id/memberships/self', async (req, res) => {
+  try {
+    const uid = req.user?.uid || null;
+    if (!uid) return res.json({ joined: false });
+
+    const joined = await hasMembership(req.params.id, uid);
+    res.json({ joined });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to check membership' });
+  }
+});
 /** GET /api/requests/mine */
 router.get('/mine', async (req, res) => {
   try {

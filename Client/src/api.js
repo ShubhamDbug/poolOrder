@@ -60,3 +60,15 @@ export async function sendMessage(requestId,user, text, token) {
   });
 }
 
+export async function getMyMembership(id, token) {
+  // Primary: GET /api/requests/:id/membership
+  try {
+    return await req(`/api/requests/${id}/membership`, { token });
+  } catch (e) {
+    try {
+      return await req(`/api/requests/${id}/memberships/self`, { token });
+    } catch {
+      throw e;
+    }
+  }
+}
