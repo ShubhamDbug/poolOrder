@@ -1,103 +1,126 @@
-import { Router } from 'express';
-import { db, Timestamp, FieldValue } from '../config/firebase.js';
-import { geobounds, geohashFor, distanceM } from '../services/geo.js';
-import { createRequestSchema, nearbySchema } from '../utils/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import express from 'express';
+import {
+  createRequest,
+  closeRequest,
+  listMine,
+  ensureMembership,
+  removeMembership,
+  deleteRequest,
+  hasMembership,  
+  listNearby
+} from '../store-firestore.js';
+import { haversineMeters } from '../utils/distance.js';
 
-const router = Router();
+const router = express.Router();
 
-/** Create a request (auth required) */
-router.post('/', requireAuth, async (req, res) => {
-  const { error, value } = createRequestSchema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.message });
-
-  const { item, platform, latitude, longitude, expiresInMinutes } = value;
-  const geohash = geohashFor(latitude, longitude);
-  const now = Timestamp.now();
-  const deleteAt = Timestamp.fromDate(new Date(Date.now() + expiresInMinutes * 60 * 1000));
-
-  const payload = {
-    uid: req.user.uid,
-    displayName: req.user.name || 'User',
-    item, platform, latitude, longitude, geohash,
-    createdAt: now,
-    deleteAt,
-    status: 'open'
-  };
-
-  const ref = await db.collection('requests').add(payload);
-  res.json({ id: ref.id, ...payload });
-});
-
-/** Close a request (owner only) */
-router.post('/:id/close', requireAuth, async (req, res) => {
-  const ref = db.collection('requests').doc(req.params.id);
-  const doc = await ref.get();
-  if (!doc.exists) return res.status(404).json({ error: 'Not found' });
-  if (doc.data().uid !== req.user.uid) return res.status(403).json({ error: 'Not owner' });
-
-  await ref.update({ status: 'closed', closedAt: Timestamp.now() });
-  res.json({ ok: true });
-});
-
-/** Join/Leave using UID-keyed docs */
-router.post('/:id/join', requireAuth, async (req, res) => {
-  const reqRef = db.collection('requests').doc(req.params.id);
-  const snap = await reqRef.get();
-  if (!snap.exists) return res.status(404).json({ error: 'Not found' });
-  if (snap.data().status === 'closed') return res.status(400).json({ error: 'Closed' });
-
-  const memberRef = reqRef.collection('joinedUsers').doc(req.user.uid);
-  await memberRef.set({
-    displayName: req.user.name || 'User',
-    photoURL: req.user.picture || '',
-    joinedAt: Timestamp.now()
-  }, { merge: true });
-
-  res.json({ ok: true });
-});
-
-router.post('/:id/leave', requireAuth, async (req, res) => {
-  const memberRef = db.collection('requests').doc(req.params.id).collection('joinedUsers').doc(req.user.uid);
-  await memberRef.delete();
-  res.json({ ok: true });
-});
-
-/** Get my requests (auth required) */
-router.get('/mine', requireAuth, async (req, res) => {
-  const snap = await db.collection('requests')
-    .where('uid', '==', req.user.uid)
-    .orderBy('createdAt', 'desc')
-    .get();
-
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  res.json(list);
-});
-
-/** Nearby search (no auth required) */
-router.get('/nearby', async (req, res) => {
-  const { error, value } = nearbySchema.validate(req.query, { convert: true });
-  if (error) return res.status(400).json({ error: error.message });
-  const { lat, lng, radiusKm } = value;
-  const radiusM = radiusKm * 1000;
-
-  const bounds = geobounds(lat, lng, radiusM);
-  const queries = bounds.map(([start, end]) =>
-    db.collection('requests').orderBy('geohash').startAt(start).endAt(end).get()
-  );
-  const snaps = await Promise.all(queries);
-
-  const collected = [];
-  for (const s of snaps) {
-    for (const d of s.docs) {
-      const data = d.data();
-      if (data.status === 'closed') continue;
-      const dist = distanceM(lat, lng, data.latitude, data.longitude);
-      if (dist <= radiusM) collected.push({ id: d.id, ...data, distanceInM: dist });
+/** POST /api/requests */
+router.post('/', async (req, res) => {
+  try {
+    const user = req.user;
+    const { item, platform, latitude, longitude, expiresInMinutes } = req.body || {};
+    if (!item || !platform || typeof latitude === 'undefined' || typeof longitude === 'undefined') {
+      return res.status(400).json({ error: 'item, platform, latitude, longitude are required' });
     }
+    const r = await createRequest({ item, platform, latitude, longitude, expiresInMinutes }, user);
+    res.json(r);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to create request' });
   }
-  collected.sort((a, b) => (a.distanceInM - b.distanceInM) || ((b.createdAt?.toMillis()||0) - (a.createdAt?.toMillis()||0)));
-  res.json(collected);
+});
+
+/** POST /api/requests/:id/close */
+router.post('/:id/close', async (req, res) => {
+  try {
+    const r = await closeRequest(req.params.id);
+    if (!r) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, request: r });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to close request' });
+  }
+});
+
+/** DELETE /api/requests/:id */
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await deleteRequest(req.params.id, req.user?.uid || null);
+    if (!result.found) return res.status(404).json({ error: 'Not found' });
+    if (result.permitted === false) return res.status(403).json({ error: 'Only owner can delete' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to delete request' });
+  }
+});
+
+/** POST /api/requests/:id/join */
+router.post('/:id/join', async (req, res) => {
+  try {
+    await ensureMembership(req.params.id, req.user?.uid || 'anon');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to join' });
+  }
+});
+
+/** POST /api/requests/:id/leave */
+router.post('/:id/leave', async (req, res) => {
+  try {
+    await removeMembership(req.params.id, req.user?.uid || 'anon');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to leave' });
+  }
+});
+router.get('/:id/membership', async (req, res) => {
+  try {
+    const uid = req.user?.uid || null;      // if not signed in → false
+    if (!uid) return res.json({ joined: false });
+
+    const joined = await hasMembership(req.params.id, uid);
+    res.json({ joined });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to check membership' });
+  }
+});
+
+/** GET /api/requests/:id/memberships/self
+ *  Fallback endpoint for older clients; same response shape.
+ */
+router.get('/:id/memberships/self', async (req, res) => {
+  try {
+    const uid = req.user?.uid || null;
+    if (!uid) return res.json({ joined: false });
+
+    const joined = await hasMembership(req.params.id, uid);
+    res.json({ joined });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to check membership' });
+  }
+});
+/** GET /api/requests/mine */
+router.get('/mine', async (req, res) => {
+  try {
+    const uid = req.user?.uid || 'anon';
+    const list = await listMine(uid);
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to fetch mine' });
+  }
+});
+
+/** GET /api/requests/nearby?lat&lng&radiusKm */
+router.get('/nearby', async (req, res) => {
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const radiusKm = Number(req.query.radiusKm || 1);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: 'lat and lng are required numeric values' });
+    }
+    const list = await listNearby(lat, lng, radiusKm, req.user?.uid || null, haversineMeters);
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to fetch nearby' });
+  }
 });
 
 export default router;

@@ -1,44 +1,88 @@
+// src/Pages/Mine.jsx
 import React from 'react'
-import { myRequests, closeRequest } from '../api.js'
-import { idToken, listenUser } from '@/lib/firebase'
 import { Link } from 'react-router-dom'
+import { useApi } from '@/contexts/ApiContext'
+import { useToast } from '@/contexts/ToastContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Mine() {
-  const [user, setUser] = React.useState(null)
-  const [list, setList] = React.useState([])
-  React.useEffect(()=> listenUser(setUser), [])
-  React.useEffect(() => { (async () => {
-    if (!user) return setList([])
-    const token = await idToken()
-    const data = await myRequests(token)
-    setList(data)
-  })() }, [user])
+  const { user } = useAuth()
+  const api = useApi()
+  const { push } = useToast()
 
-  async function close(id) {
-    const token = await idToken()
-    await closeRequest(id, token)
-    setList(prev => prev.map(x => x.id===id ? { ...x, status:'closed' } : x))
+  const [list, setList] = React.useState([])
+  const [loading, setLoading] = React.useState(false)
+  const [deletingId, setDeletingId] = React.useState(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      try {
+        const data = await api.myRequests()
+        if (!cancelled) setList(Array.isArray(data) ? data : [])
+      } catch (e) {
+        if (!cancelled) push({ type: 'error', message: 'Failed to load your requests' })
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [api, push])
+
+  async function closeReq(id) {
+    try {
+      await api.closeRequest(id)
+      setList(prev => prev.map(r => r.id === id ? { ...r, closed: true, status: 'closed' } : r))
+      push({ type: 'success', message: 'Request closed' })
+    } catch {
+      push({ type: 'error', message: 'Failed to close request' })
+    }
   }
 
-  if (!user) return <div className="p-4 rounded-xl border bg-white">Please sign in to view your requests.</div>
+  async function delReq(id) {
+    try {
+      setDeletingId(id)
+      await api.deleteRequest(id)
+      setList(prev => prev.filter(r => r.id !== id))
+      push({ type: 'success', message: 'Request deleted' })
+    } catch {
+      push({ type: 'error', message: 'Failed to delete request' })
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-semibold">My Requests</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="p-4 space-y-4">
+      <h2 className="text-lg font-semibold">My Requests</h2>
+
+      {loading && <p className="text-sm text-gray-500">Loading…</p>}
+
+      <div className="space-y-3">
         {list.map(r => (
-          <div key={r.id} className="p-4 rounded-2xl border bg-white shadow-sm space-y-2">
-            <div className="font-semibold">🛒 {r.item}</div>
-            <div className="text-sm text-gray-500">Platform: {r.platform}</div>
-            <div className="text-sm">Status: {r.status}</div>
-            <div className="flex gap-2">
-              <Link to={`/chat/${r.id}`} className="px-3 py-1 rounded-lg border">Open Chat</Link>
-              {r.status!=='closed' && <button className="px-3 py-1 rounded-lg border" onClick={()=>close(r.id)}>Close</button>}
+          <div key={r.id} className="p-3 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">{r.item} <span className="text-xs text-gray-500">({r.platform})</span></div>
+                <div className="text-xs text-gray-500">Status: {r.status || (r.closed ? 'closed' : 'open')}</div>
+                {/* ✅ Chat entry per item */}
+                <Link to={`/chat/${r.id}`} className="text-sm underline">Chat</Link>
+              </div>
+              <div className="flex items-center gap-2">
+                {!r.closed && <button className="px-3 py-1 rounded border" onClick={()=>closeReq(r.id)}>Close</button>}
+                <button className="px-3 py-1 rounded border" onClick={()=>delReq(r.id)} disabled={deletingId===r.id}>
+                  {deletingId===r.id ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
-      {list.length===0 && <p className="text-sm text-gray-500">You have no requests yet.</p>}
+
+      {!loading && list.length === 0 && (
+        <p className="text-sm text-gray-500">You have no requests yet.</p>
+      )}
     </div>
   )
 }

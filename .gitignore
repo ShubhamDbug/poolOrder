@@ -1,0 +1,6 @@
+serviceAccountKey.json
+*.pem
+*.p8
+*.key
+*.crt
+**/firebase*.json
