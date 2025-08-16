@@ -1,11 +1,13 @@
-// src/lib/firebase.ts
-import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
-  getAuth, type Auth, onAuthStateChanged, signOut,
-  GoogleAuthProvider, signInWithPopup, signInWithRedirect, type User
-} from "firebase/auth";
-import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
-
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  type User,
+} from 'firebase/auth';
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -16,41 +18,89 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Prevent re-init during HMR
-export const app: FirebaseApp =
-  getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
-export const auth: Auth = getAuth(app);
-
-// Optional analytics (browser-only + supported)
-export let analytics: Analytics | null = null;
-if (typeof window !== "undefined") {
-  isSupported().then((ok) => { if (ok) analytics = getAnalytics(app); }).catch(() => {});
+/** New name (and exported alias below): subscribe to auth changes. */
+function listenUser(setter: (u: User | null) => void) {
+  return onAuthStateChanged(auth, setter);
 }
 
-// ─── Google-only helpers ──────────────────────────────────────────────────────
-const provider = new GoogleAuthProvider();
-// Nice UX: always show account chooser
-provider.setCustomParameters({ prompt: "select_account" });
+/** New name (and exported alias below): fetch ID token or null. */
+async function idToken(forceRefresh = false): Promise<string | null> {
+  const u = auth.currentUser;
+  if (!u) return null;
+  return u.getIdToken(forceRefresh);
+}
 
-export const listenUser = (setter: (u: User | null) => void) =>
-  onAuthStateChanged(auth, setter);
-
-export async function signInWithGoogle() {
+/** New name (and exported alias below): Google sign-in with popup + redirect fallback. */
+async function signInWithGoogle(): Promise<User> {
   try {
-    // Popups are great on desktop; redirect fallback covers popup blockers/mobile
-    await signInWithPopup(auth, provider);
+    const res = await signInWithPopup(auth, provider);
+    return res.user;
   } catch (err: any) {
-    if (err?.code === "auth/popup-blocked" || err?.code === "auth/operation-not-supported-in-this-environment") {
+    if (
+      err?.code === 'auth/popup-blocked' ||
+      err?.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
       await signInWithRedirect(auth, provider);
-      return;
+      // After redirect, wait for state
+      return new Promise<User>((resolve, reject) => {
+        const unsub = onAuthStateChanged(
+          auth,
+          (u) => {
+            if (u) {
+              unsub();
+              resolve(u);
+            }
+          },
+          reject
+        );
+        setTimeout(() => reject(new Error('Sign-in redirect timed out')), 60_000);
+      });
     }
     throw err;
   }
 }
 
-export const signOutUser = () => signOut(auth);
+/** New name (and exported alias below). */
+async function signOutNow() {
+  return firebaseSignOut(auth);
+}
 
-export const idToken = async () =>
-  auth.currentUser ? auth.currentUser.getIdToken() : null;
-export const login = signInWithGoogle;
+/* ---------- Backward-compatible aliases (old names) ---------- */
+const login = signInWithGoogle;
+const logout = signOutNow;
+const getIdToken = idToken;
+const onAuth = listenUser;
+
+/* ------------------- Named exports ------------------- */
+export {
+  auth,
+  listenUser,
+  idToken,
+  signInWithGoogle,
+  signOutNow,
+  // Old names:
+  login,
+  logout,
+  getIdToken,
+  onAuth,
+};
+
+export type { User };
+
+/* ------------------- Default export ------------------- */
+export default {
+  auth,
+  listenUser,
+  idToken,
+  signInWithGoogle,
+  signOutNow ,
+  // Old names:
+  login,
+  logout,
+  getIdToken,
+  onAuth,
+};

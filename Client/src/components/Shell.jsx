@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { listenUser, signInWithGoogle, signOutUser } from '@/lib/firebase' // from your firebase.ts
+import { listenUser, signInWithGoogle, signOutNow } from '@/lib/firebase' // from your firebase.ts
 
 export default function Shell({ children }) {
   const [user, setUser] = React.useState(null)
@@ -16,7 +16,7 @@ export default function Shell({ children }) {
   }
   async function handleSignOut() {
     setErr(null)
-    try { await signOutUser() } catch (e) {
+    try { await signOutNow() } catch (e) {
       console.error(e); setErr(`${e.code ?? e.name}: ${e.message}`)
     }
   }
