@@ -1,35 +1,30 @@
+// Server/src/server.js
 import express from 'express';
 import cors from 'cors';
+
+// Ensure Firebase Admin is initialized before auth middleware
+import './firebase-init.js';
+
 import requestsRoute from './routes/requests.js';
 import messagesRoute from './routes/messages.js';
+import { verifyAuth } from './auth.js';
 
 const app = express();
 
-// Very permissive for simplicity (frontend should just work)
+// Permissive CORS for dev; tighten as needed
 app.use(cors());
 app.use(express.json());
 
-// Super-light "auth stub": if a Bearer token exists, fabricate a uid from it.
-// This keeps your existing frontend flows happy without real verification.
-app.use((req, _res, next) => {
-  const auth = req.headers['authorization'];
-  if (auth && auth.startsWith('Bearer ')) {
-    const raw = auth.slice(7);
-    const uid = 'uid_' + (raw.slice(-8) || 'anon');
-    req.user = { uid, displayName: 'User' };
-  } else {
-    req.user = { uid: 'anon', displayName: 'User' };
-  }
-  next();
-});
+// Attach req.user = { uid, displayName } to every request
+app.use(verifyAuth);
 
 app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// Route mounts
+// API routes
 app.use('/api/requests', requestsRoute);
 app.use('/api/messages', messagesRoute);
 
-// Fallback 404
+// 404
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
 
 const PORT = process.env.PORT || 8080;

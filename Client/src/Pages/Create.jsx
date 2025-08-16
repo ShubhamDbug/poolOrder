@@ -35,7 +35,7 @@ export default function Create() {
         latitude: Number(loc.lat), longitude: Number(loc.lng),
         expiresInMinutes: Number(minutes)
       }
-      const created = await createRequest(payload, token)
+      const created = await createRequest(payload, token,)
       navigate(`/chat/${created.id}`)
     } catch (e) {
       setErr(e.message)
