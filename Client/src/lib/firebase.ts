@@ -1,3 +1,4 @@
+// src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
@@ -8,6 +9,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,90 +17,51 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 
-/** New name (and exported alias below): subscribe to auth changes. */
-function listenUser(setter: (u: User | null) => void) {
-  return onAuthStateChanged(auth, setter);
-}
+export const listenUser = (setter: (u: User | null) => void) =>
+  onAuthStateChanged(auth, setter);
 
-/** New name (and exported alias below): fetch ID token or null. */
-async function idToken(forceRefresh = false): Promise<string | null> {
-  const u = auth.currentUser;
-  if (!u) return null;
-  return u.getIdToken(forceRefresh);
-}
-
-/** New name (and exported alias below): Google sign-in with popup + redirect fallback. */
-async function signInWithGoogle(): Promise<User> {
+export async function signInWithGoogle() {
   try {
-    const res = await signInWithPopup(auth, provider);
-    return res.user;
+    await signInWithPopup(auth, provider);
   } catch (err: any) {
-    if (
-      err?.code === 'auth/popup-blocked' ||
-      err?.code === 'auth/operation-not-supported-in-this-environment'
-    ) {
+    if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
       await signInWithRedirect(auth, provider);
-      // After redirect, wait for state
-      return new Promise<User>((resolve, reject) => {
-        const unsub = onAuthStateChanged(
-          auth,
-          (u) => {
-            if (u) {
-              unsub();
-              resolve(u);
-            }
-          },
-          reject
-        );
-        setTimeout(() => reject(new Error('Sign-in redirect timed out')), 60_000);
-      });
+      return;
     }
     throw err;
   }
 }
 
-/** New name (and exported alias below). */
-async function signOutNow() {
-  return firebaseSignOut(auth);
+export const signOutNow = () => firebaseSignOut(auth);
+
+export async function idToken(): Promise<string | null> {
+  const u = auth.currentUser;
+  if (!u) return null;
+  return await u.getIdToken();
 }
 
-/* ---------- Backward-compatible aliases (old names) ---------- */
-const login = signInWithGoogle;
-const logout = signOutNow;
-const getIdToken = idToken;
-const onAuth = listenUser;
+// Back-compat names
+export const login = signInWithGoogle;
+export const logout = signOutNow;
+export const getIdToken = idToken;
+export const onAuth = listenUser;
 
-/* ------------------- Named exports ------------------- */
-export {
-  auth,
-  listenUser,
-  idToken,
-  signInWithGoogle,
-  signOutNow,
-  // Old names:
-  login,
-  logout,
-  getIdToken,
-  onAuth,
-};
-
+export { auth };
 export type { User };
 
-/* ------------------- Default export ------------------- */
 export default {
   auth,
   listenUser,
   idToken,
   signInWithGoogle,
-  signOutNow ,
-  // Old names:
+  signOutNow,
   login,
   logout,
   getIdToken,

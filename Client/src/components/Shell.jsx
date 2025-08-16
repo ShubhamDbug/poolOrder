@@ -1,24 +1,18 @@
+// src/components/Shell.jsx
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { listenUser, signInWithGoogle, signOutNow } from '@/lib/firebase' // from your firebase.ts
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function Shell({ children }) {
-  const [user, setUser] = React.useState(null)
-  const [err, setErr] = React.useState(null)
-
-  React.useEffect(() => listenUser(setUser), [])
+  const { user, loading, signIn, signOut } = useAuth()
+  const { push } = useToast()
 
   async function handleSignIn() {
-    setErr(null)
-    try { await signInWithGoogle() } catch (e) {
-      console.error(e); setErr(`${e.code ?? e.name}: ${e.message}`)
-    }
+    try { await signIn() } catch (e) { push({ type:'error', message: e?.message || 'Sign-in failed' }) }
   }
   async function handleSignOut() {
-    setErr(null)
-    try { await signOutNow() } catch (e) {
-      console.error(e); setErr(`${e.code ?? e.name}: ${e.message}`)
-    }
+    try { await signOut() } catch (e) { push({ type:'error', message: e?.message || 'Sign-out failed' }) }
   }
 
   return (
@@ -32,28 +26,19 @@ export default function Shell({ children }) {
             <Link to="/mine" className="hover:underline">My Requests</Link>
             {user ? (
               <>
+                <span className="text-sm text-gray-600">Hi, {user.displayName || 'User'}</span>
                 <button className="px-3 py-1 rounded-lg border" onClick={handleSignOut}>Sign out</button>
-                {user.photoURL && <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" />}
-                <span className="text-sm">{user.displayName || user.email}</span>
               </>
             ) : (
-              <button className="px-3 py-1 rounded-lg border" onClick={handleSignIn}>Sign in with Google</button>
+              <button className="px-3 py-1 rounded-lg border" onClick={handleSignIn} disabled={loading}>
+                {loading ? '...' : 'Sign in with Google'}
+              </button>
             )}
           </nav>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {children}
-      </main>
-
-      {err && (
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="mt-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm">
-            <strong>Error:</strong> {err}
-          </div>
-        </div>
-      )}
+      <main className="max-w-5xl mx-auto px-4 py-6">{children}</main>
 
       <footer className="border-t py-6 text-center text-sm text-gray-500">
         React + Tailwind v4 + Firebase (Google OAuth)

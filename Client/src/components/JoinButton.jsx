@@ -1,76 +1,49 @@
 // src/components/JoinButton.jsx
 import React from 'react'
-import { idToken, listenUser, signInWithGoogle } from '@/lib/firebase'
-import { joinRequest, leaveRequest, getMyMembership } from '../api.js'
+import { useAuth } from '@/contexts/AuthContext'
+import { useApi } from '@/contexts/ApiContext'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function JoinButton({ requestId, membership = false }) {
-  const [user, setUser] = React.useState(null)
+  const { user, signIn } = useAuth()
+  const api = useApi()
+  const { push } = useToast()
+
   const [joined, setJoined] = React.useState(!!membership)
   const [pending, setPending] = React.useState(false)
-  const [error, setError] = React.useState(null)
 
-  // keep user in sync
-  React.useEffect(() => listenUser(setUser), [])
-
-  // honor initial prop (e.g., SSR/parent guess); will be overwritten by server truth
   React.useEffect(() => setJoined(!!membership), [membership])
 
-  // whenever auth user changes, fetch real membership from server so it survives logout/login & reloads
   React.useEffect(() => {
-    let cancelled = false
+    let mounted = true
     ;(async () => {
-      if (!user) { setJoined(false); return }        // signed out → show "Join"
+      if (!requestId || !user) return
       try {
-        const token = await idToken()
-        if (!token) return
-        const { joined: isJoined } = await getMyMembership(requestId, token)
-        if (!cancelled) setJoined(!!isJoined)
-      } catch (e) {
-        // ignore; the button can still toggle optimistically
-        console.warn('membership check failed', e)
-      }
+        const m = await api.getMyMembership(requestId)
+        if (mounted) setJoined(!!m?.active)
+      } catch {}
     })()
-    return () => { cancelled = true }
-  }, [user, requestId])
+    return () => { mounted = false }
+  }, [requestId, user, api])
 
   async function toggle() {
-    if (pending) return
-    setError(null)
-
+    if (!user) {
+      await signIn().catch(()=>{})
+      return
+    }
+    setPending(true)
     try {
-      if (!user) {
-        const u = await signInWithGoogle()
-        setUser(u)
-      }
-      setPending(true)
-
-      const token = await idToken()
-      if (!token) throw new Error('No ID token')
-
-      if (joined) {
-        await leaveRequest(requestId, token)
-      } else {
-        await joinRequest(requestId, token)
-      }
-
-      // revalidate from server so UI matches DB
-      try {
-        const { joined: isJoined } = await getMyMembership(requestId, token)
-        setJoined(!!isJoined)
-      } catch {
-        // fall back to optimistic flip if check fails
-        setJoined((prev) => !prev)
-      }
+      if (joined) { await api.leaveRequest(requestId); setJoined(false) }
+      else { await api.joinRequest(requestId); setJoined(true) }
     } catch (e) {
-      console.error(e)
-      setError(e?.message || 'Failed to update membership')
+      push({ type:'error', message: e?.message || 'Action failed' })
     } finally {
       setPending(false)
     }
   }
 
-  const label = pending ? (joined ? 'Leaving…' : 'Joining…') : (joined ? 'Leave' : 'Join')
-  const title = joined ? 'Leave this request' : 'Join this request'
+  const label = joined ? 'Leave' : 'Join'
+  const title = joined ? 'You have joined; click to leave' : 'Join this request'
 
   return (
     <div className="flex items-center gap-2">
@@ -83,7 +56,6 @@ export default function JoinButton({ requestId, membership = false }) {
       >
         {label}
       </button>
-      {error && <span className="text-xs text-rose-600">{error}</span>}
     </div>
   )
 }
