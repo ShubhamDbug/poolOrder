@@ -10,12 +10,12 @@ import {
   listNearby
 } from '../store-firestore.js';
 import { haversineMeters } from '../utils/distance.js';
+import { requireAuth } from '../auth.js';
 
 const router = express.Router();
 
 /** POST /api/requests */
-router.post('/', async (req, res) => {
-      console.log(req) ;
+router.post('/', requireAuth, async (req, res) => {
 
   try {
     const user = req.user;
@@ -32,7 +32,6 @@ router.post('/', async (req, res) => {
 
 /** POST /api/requests/:id/close */
 router.post('/:id/close', async (req, res) => {
-      console.log(req) ;
 
   try {
     const r = await closeRequest(req.params.id);
@@ -44,8 +43,7 @@ router.post('/:id/close', async (req, res) => {
 });
 
 /** DELETE /api/requests/:id */
-router.delete('/:id', async (req, res) => {
-      console.log(req) ;
+router.delete('/:id', requireAuth, async (req, res) => {
 
   try {
     const result = await deleteRequest(req.params.id, req.user?.uid || null);
@@ -58,8 +56,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 /** POST /api/requests/:id/join */
-router.post('/:id/join', async (req, res) => {
-      console.log(req) ;
+router.post('/:id/join', requireAuth, async (req, res) => {
 
   try {
     await ensureMembership(req.params.id, req.user?.uid || 'anon');
@@ -70,8 +67,7 @@ router.post('/:id/join', async (req, res) => {
 });
 
 /** POST /api/requests/:id/leave */
-router.post('/:id/leave', async (req, res) => {
-      console.log(req) ;
+router.post('/:id/leave', requireAuth, async (req, res) => {
 
   try {
     await removeMembership(req.params.id, req.user?.uid || 'anon');
@@ -81,7 +77,6 @@ router.post('/:id/leave', async (req, res) => {
   }
 });
 router.get('/:id/membership', async (req, res) => {
-      console.log(req) ;
 
   try {
     const uid = req.user?.uid || null;      // if not signed in → false
@@ -98,7 +93,6 @@ router.get('/:id/membership', async (req, res) => {
  *  Fallback endpoint for older clients; same response shape.
  */
 router.get('/:id/memberships/self', async (req, res) => {
-      console.log(req) ;
 
   try {
     const uid = req.user?.uid || null;
@@ -111,11 +105,10 @@ router.get('/:id/memberships/self', async (req, res) => {
   }
 });
 /** GET /api/requests/mine */
-router.get('/mine', async (req, res) => {
-      console.log(req) ;
+router.get('/mine', requireAuth, async (req, res) => {
 
   try {
-    const uid = req.user?.uid || 'anon';
+    const uid = req.user?.uid;
     const list = await listMine(uid);
     res.json(list);
   } catch (e) {
@@ -125,7 +118,6 @@ router.get('/mine', async (req, res) => {
 
 /** GET /api/requests/nearby?lat&lng&radiusKm */
 router.get('/nearby', async (req, res) => {
-    console.log(req) ;
   try {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);

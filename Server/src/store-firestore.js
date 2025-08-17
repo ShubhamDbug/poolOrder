@@ -54,6 +54,7 @@ export async function createRequest(
     membersCount: 1, // ← owner is auto-joined below
   };
 
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const ref = await db.collection('requests').add(data);
 
   // ✅ Auto-join the owner so they can chat immediately
@@ -71,6 +72,7 @@ export async function createRequest(
 }
 
 export async function closeRequest(id) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const ref = db.collection('requests').doc(id);
   const snap = await ref.get();
   if (!snap.exists) return null;
@@ -80,6 +82,7 @@ export async function closeRequest(id) {
 }
 
 export async function listMine(uid) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const q = db.collection('requests').where('uid', '==', uid);
   const snap = await q.get();
   const items = snap.docs.map((doc) => {
@@ -103,6 +106,7 @@ export async function listMine(uid) {
 }
 
 export async function deleteRequest(id, uid) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const reqRef = db.collection('requests').doc(id);
   const reqSnap = await reqRef.get();
   if (!reqSnap.exists) return { found: false };
@@ -128,6 +132,7 @@ export async function ensureMembership(requestId, uid) {
   if (!requestId) throw new Error('Missing requestId');
   if (!uid) throw new Error('Missing uid');
 
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const reqRef = db.collection('requests').doc(requestId);
   const now = Timestamp.fromMillis(Date.now());
 
@@ -159,6 +164,7 @@ export async function removeMembership(requestId, uid) {
   if (!requestId) throw new Error('Missing requestId');
   if (!uid) throw new Error('Missing uid');
 
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const reqRef = db.collection('requests').doc(requestId);
 
   await db.runTransaction(async (tx) => {
@@ -181,6 +187,7 @@ export async function removeMembership(requestId, uid) {
 }
 
 export async function hasMembership(requestId, uid) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const mref = db.collection('requests').doc(requestId).collection('members').doc(uid);
   const ms = await mref.get();
   return ms.exists;
@@ -188,12 +195,14 @@ export async function hasMembership(requestId, uid) {
 
 // ✅ helper to allow owner to read chat even if membership doc missing
 export async function isOwner(requestId, uid) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const snap = await db.collection('requests').doc(requestId).get();
   return snap.exists && snap.data().uid === uid;
 }
 
 // ---- Nearby & Messages ----
 export async function listNearby(lat, lng, radiusKm, currentUid, distanceFn) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const nowTs = Timestamp.fromMillis(Date.now());
   const q = db.collection('requests').where('deleteAt', '>', nowTs).orderBy('deleteAt', 'asc');
   const snap = await q.get();
@@ -210,6 +219,7 @@ export async function listNearby(lat, lng, radiusKm, currentUid, distanceFn) {
 }
 
 export async function listMessages(requestId) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const q = db
     .collection('requests')
     .doc(requestId)
@@ -220,6 +230,7 @@ export async function listMessages(requestId) {
 }
 
 export async function addMessage(requestId, { uid, displayName, text }) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const mref = db
     .collection('requests')
     .doc(requestId)
@@ -237,6 +248,7 @@ export async function addMessage(requestId, { uid, displayName, text }) {
 
 // Check if a request exists and is still active (deleteAt > now)
 export async function isRequestActive(requestId) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const ref = db.collection('requests').doc(requestId);
   const snap = await ref.get();
   if (!snap.exists) return { exists: false, active: false, ref };
@@ -248,6 +260,7 @@ export async function isRequestActive(requestId) {
 
 // Hard-delete all expired requests and their subcollections
 export async function cleanupExpiredRequests(limit = 50) {
+  if (!db) throw new Error('Firestore not initialized (FIREBASE_SERVICE_ACCOUNT_KEY missing?)');
   const nowTs = Timestamp.fromMillis(Date.now());
   const expiredQ = db.collection('requests').where('deleteAt', '<=', nowTs).limit(limit);
 

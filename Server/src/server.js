@@ -4,7 +4,7 @@ import cors from 'cors';
 import './firebase-init.js';
 import requestsRoute from './routes/requests.js';
 import messagesRoute from './routes/messages.js';
-// import { verifyAuth } from './auth.js';
+import { verifyAuth } from './auth.js';
 
 const app = express();
 
@@ -21,6 +21,8 @@ const ENV_ALLOWED = parseAllowed(process.env.FRONTEND_ORIGIN);
 const FALLBACK_ALLOWED = [
   'https://poolorder.onrender.com',
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
   '*.vercel.app', // optional wildcard host match
 ];
 
@@ -49,10 +51,16 @@ function sanitizeRequestHeaders(req) {
 }
 
 const corsOptions = {
-  origin(origin, cb) { cb(null, isAllowedOrigin(origin)); },
+  origin(origin, cb) {
+    const allowed = isAllowedOrigin(origin);
+    if (allowed) return cb(null, true);
+    // return explicit error so the cors middleware doesn't silently fail
+    return cb(new Error('CORS origin denied: ' + String(origin)));
+  },
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: (req, cb) => cb(null, sanitizeRequestHeaders(req)),
+  // keep headers minimal and explicit; allow Authorization for bearer tokens
+  allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept'],
   optionsSuccessStatus: 204,
 };
 
@@ -61,9 +69,29 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
+// Ensure caches/proxies vary by Origin so responses differ per allowed origin
+app.use((req, res, next) => {
+  res.header('Vary', 'Origin');
+  next();
+});
+
+// Lightweight explicit preflight responder (works even if other middleware errors)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(corsOptions.optionsSuccessStatus || 204);
+  }
+  next();
+});
+
 // If you have auth middleware, never gate OPTIONS
 // app.use((req, _res, next) => req.method === 'OPTIONS' ? next() : next());
 // app.use(verifyAuth);
+// Ensure OPTIONS bypasses auth and attach auth for other requests
+app.use((req, _res, next) => (req.method === 'OPTIONS' ? next() : next()));
+app.use(verifyAuth);
 
 app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 

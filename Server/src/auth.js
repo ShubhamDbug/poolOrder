@@ -1,25 +1,12 @@
 
-import './firebase-init.js'; 
+import './firebase-init.js';
 import admin from 'firebase-admin';
-
 
 export async function verifyAuth(req, _res, next) {
   try {
     const h = req.headers || {};
-    console.log(h) ;
     const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
-    console.log(authHeader) ;
     const hasBearer = authHeader.startsWith('Bearer ');
-    const hasSessionCookie = typeof h['cookie'] === 'string' && /__session=/.test(h['cookie']);
-
-    // Safe request log
-    console.log({
-      tag: 'req',
-      method: req.method,
-      path: req.originalUrl || req.url,
-      hasBearer,
-      hasSessionCookie,
-    });
 
     if (!hasBearer) {
       // Treat as anonymous for public endpoints; protected routes should check req.user later
@@ -49,8 +36,17 @@ export async function verifyAuth(req, _res, next) {
 
     return next();
   } catch (e) {
+    // Keep failure non-fatal for public endpoints
     console.warn('verifyAuth failed:', e && e.code ? e.code : e?.message);
     req.user = { uid: 'anon' };
     return next();
   }
+}
+
+export function requireAuth(req, res, next) {
+  const uid = req.user?.uid;
+  if (!uid || uid === 'anon') {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  return next();
 }
