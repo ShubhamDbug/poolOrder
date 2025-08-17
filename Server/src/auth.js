@@ -16,7 +16,7 @@ export async function verifyAuth(req, _res, next) {
  
   const authHeader = req.headers.authorization || '';
    console.log(req.headers) ;
-   console.log(req.headers.authorization) ;
+   console.log("This is auth ",req.headers.authorization) ;
   if (!authHeader.startsWith('Bearer ')) {
     req.user = { uid: 'anon' };
     return next();
