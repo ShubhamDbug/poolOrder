@@ -1,5 +1,5 @@
 // store-firestore.js
-import { db, Timestamp } from './firebase-init.js';
+import { db } from './firebase-init.js';
 import { nanoid } from 'nanoid';
 
 // ---- helpers ----
