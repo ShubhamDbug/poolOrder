@@ -90,16 +90,20 @@ async function request(path,
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
     console.log('[Auth Debug] Added token to headers');
+    console.log('[Auth Debug] Token preview:', authToken.substring(0, 20) + '...');
   } else {
     console.log('[Auth Debug] No token available for request');
   }
 
   const url = `${BASE_URL}${path}`;
+  console.log('[Auth Debug] Final headers:', headers);
+  console.log('[Auth Debug] Request URL:', url);
+  
   const res = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    credentials: 'omit',
+    credentials: 'include',
     mode: 'cors',
   });
   console.log("result : " , res) ;
