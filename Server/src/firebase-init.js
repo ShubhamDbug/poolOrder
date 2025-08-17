@@ -1,35 +1,67 @@
 // Server/src/firebase-init.js
-import admin from 'firebase-admin';
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import admin from 'firebase-admin';
 
-function tryReadJSON(p) {
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+function loadServiceAccount() {
+  // A) Plain JSON in env var
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  // B) Base64-encoded JSON in env var
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  // C) File path to JSON (e.g., Render Secret File)
+  const pathEnv = process.env.SERVICE_ACCOUNT_PATH;
+
+  // Common default for Render Secret File name
+  const defaultPaths = [
+    pathEnv,
+    '/etc/secrets/serviceAccountKey.json',
+    './serviceAccountKey.json',
+  ].filter(Boolean);
+
+  let json = null;
+
+  if (raw && raw.trim().startsWith('{')) {
+    json = raw.trim();
+  } else if (b64) {
+    try { json = Buffer.from(b64, 'base64').toString('utf8'); } catch {}
+  } else {
+    for (const p of defaultPaths) {
+      try {
+        if (p && fs.existsSync(p)) {
+          json = fs.readFileSync(p, 'utf8');
+          break;
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  if (!json) return null;
+
+  const obj = JSON.parse(json);
+  if (typeof obj.private_key === 'string' && obj.private_key.includes('\\n')) {
+    obj.private_key = obj.private_key.replace(/\\n/g, '\n');
+  }
+  return obj;
 }
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const candidatePaths = [
-  '/etc/secrets/serviceAccountKey.json',                 // Render Secret File
-  path.resolve(__dirname, '../serviceAccountKey.json'),  // Local dev
-  path.resolve(__dirname, '../../serviceAccountKey.json')// Repo root
-];
-
-let serviceAccount = null;
-for (const p of candidatePaths) {
-  serviceAccount = tryReadJSON(p);
-  if (serviceAccount) break;
-}
-if (!serviceAccount) throw new Error('serviceAccountKey.json not found');
 
 if (!admin.apps.length) {
+  const sa = loadServiceAccount();
+  if (!sa) {
+    throw new Error(
+      'Missing Firebase Admin service account. ' +
+      'Set FIREBASE_SERVICE_ACCOUNT (JSON), FIREBASE_SERVICE_ACCOUNT_BASE64, or SERVICE_ACCOUNT_PATH.'
+    );
+  }
+
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id,
+    credential: admin.credential.cert(sa),
+    projectId: sa.project_id, // keeps token audience/issuer checks aligned
   });
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[firebase-admin] initialized for project:', sa.project_id);
+  }
 }
 
+export default admin;
 export const db = admin.firestore();
-export const Timestamp = admin.firestore.Timestamp;
+export const fbAuth = admin.auth();
