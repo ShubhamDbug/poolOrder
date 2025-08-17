@@ -2,7 +2,7 @@
 // Verifies Firebase ID tokens and attaches req.user = { uid, displayName }
 
 import './firebase-init.js'; // ensure Firebase Admin is initialized
-import admin from 'firebase-admin';
+import admin, { auth } from 'firebase-admin';
 
 /**
  * verifyAuth
@@ -14,7 +14,7 @@ import admin from 'firebase-admin';
  */
 export async function verifyAuth(req, _res, next) {
   const authHeader = req.headers.authorization || '';
-
+  console.log(authHeader) ;
   if (!authHeader.startsWith('Bearer ')) {
     req.user = { uid: 'anon' };
     return next();
