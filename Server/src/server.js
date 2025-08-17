@@ -15,11 +15,12 @@ function parseAllowed(val) {
     .map(s => s.trim())
     .filter(Boolean);
 }
-const ENV_ALLOWED = parseAllowed(process.env.FRONTEND_ORIGIN);
+const ENV_ALLOWED = parseAllowed(process.env.FRONTALLOWED || process.env.FRONTEND_ORIGIN);
 
 // ✅ Fallback if env var not set
 const FALLBACK_ALLOWED = [
   'https://poolorder.onrender.com',
+  'https://poolorder.vercel.app',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
