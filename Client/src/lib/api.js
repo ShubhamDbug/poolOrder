@@ -62,8 +62,9 @@ async function getLocationOrCached() {
  * - You can also pass an explicit `token` to override (primarily used by ApiContext).
  * - Public endpoints should leave both `authRequired` and `token` unset.
  */
-async function request(path, opts = {}) {
-  const { method = 'GET', body, token, authRequired = false } = opts;
+async function request(path, 
+  opts = {}) {
+  const { method = 'GET', body, token, authRequired = true } = opts;
 
   const headers = { 'Content-Type': 'application/json' };
 
@@ -80,6 +81,9 @@ async function request(path, opts = {}) {
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
+   console.log("methods in api : " , api) ;
+  console.log("body in api " , body) ;
+  console.log("header in api : " , headers) ;
 
   const url = `${BASE_URL}${path}`;
   const res = await fetch(url, {
@@ -89,6 +93,8 @@ async function request(path, opts = {}) {
     credentials: 'omit',
     mode: 'cors',
   });
+  console.log("result : " , res) ;
+ 
 
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');

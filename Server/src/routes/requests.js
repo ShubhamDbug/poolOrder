@@ -15,6 +15,8 @@ const router = express.Router();
 
 /** POST /api/requests */
 router.post('/', async (req, res) => {
+      console.log(req) ;
+
   try {
     const user = req.user;
     const { item, platform, latitude, longitude, expiresInMinutes } = req.body || {};
@@ -30,6 +32,8 @@ router.post('/', async (req, res) => {
 
 /** POST /api/requests/:id/close */
 router.post('/:id/close', async (req, res) => {
+      console.log(req) ;
+
   try {
     const r = await closeRequest(req.params.id);
     if (!r) return res.status(404).json({ error: 'Not found' });
@@ -41,6 +45,8 @@ router.post('/:id/close', async (req, res) => {
 
 /** DELETE /api/requests/:id */
 router.delete('/:id', async (req, res) => {
+      console.log(req) ;
+
   try {
     const result = await deleteRequest(req.params.id, req.user?.uid || null);
     if (!result.found) return res.status(404).json({ error: 'Not found' });
@@ -53,6 +59,8 @@ router.delete('/:id', async (req, res) => {
 
 /** POST /api/requests/:id/join */
 router.post('/:id/join', async (req, res) => {
+      console.log(req) ;
+
   try {
     await ensureMembership(req.params.id, req.user?.uid || 'anon');
     res.json({ ok: true });
@@ -63,6 +71,8 @@ router.post('/:id/join', async (req, res) => {
 
 /** POST /api/requests/:id/leave */
 router.post('/:id/leave', async (req, res) => {
+      console.log(req) ;
+
   try {
     await removeMembership(req.params.id, req.user?.uid || 'anon');
     res.json({ ok: true });
@@ -71,6 +81,8 @@ router.post('/:id/leave', async (req, res) => {
   }
 });
 router.get('/:id/membership', async (req, res) => {
+      console.log(req) ;
+
   try {
     const uid = req.user?.uid || null;      // if not signed in → false
     if (!uid) return res.json({ joined: false });
@@ -86,6 +98,8 @@ router.get('/:id/membership', async (req, res) => {
  *  Fallback endpoint for older clients; same response shape.
  */
 router.get('/:id/memberships/self', async (req, res) => {
+      console.log(req) ;
+
   try {
     const uid = req.user?.uid || null;
     if (!uid) return res.json({ joined: false });
@@ -98,6 +112,8 @@ router.get('/:id/memberships/self', async (req, res) => {
 });
 /** GET /api/requests/mine */
 router.get('/mine', async (req, res) => {
+      console.log(req) ;
+
   try {
     const uid = req.user?.uid || 'anon';
     const list = await listMine(uid);
