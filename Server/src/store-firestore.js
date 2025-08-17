@@ -1,6 +1,6 @@
 // store-firestore.js
-import { db, Timestamp } from './firebase-init.js';
-import { nanoid } from 'nanoid';
+import { db } from './firebase-init.js';
+import { Timestamp } from 'firebase-admin/firestore';import { nanoid } from 'nanoid';
 
 // ---- helpers ----
 const tsObj = (ts) =>
