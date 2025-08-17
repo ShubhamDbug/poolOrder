@@ -11,26 +11,18 @@ function tryReadJSON(p) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Try Render secret path first, then local dev fallbacks
 const candidatePaths = [
   '/etc/secrets/serviceAccountKey.json',                 // Render Secret File
-  path.resolve(__dirname, '../serviceAccountKey.json'),  // Local dev (Server/serviceAccountKey.json)
-  path.resolve(__dirname, '../../serviceAccountKey.json')// Repo root (some hosts mount here)
+  path.resolve(__dirname, '../serviceAccountKey.json'),  // Local dev
+  path.resolve(__dirname, '../../serviceAccountKey.json')// Repo root
 ];
 
 let serviceAccount = null;
 for (const p of candidatePaths) {
   serviceAccount = tryReadJSON(p);
-  if (serviceAccount) {
-    // Optional: uncomment for debugging (prints path only, not secrets)
-    // console.log('[firebase-init] Loaded service account from:', p);
-    break;
-  }
+  if (serviceAccount) break;
 }
-
-if (!serviceAccount) {
-  throw new Error('serviceAccountKey.json not found in any known location');
-}
+if (!serviceAccount) throw new Error('serviceAccountKey.json not found');
 
 if (!admin.apps.length) {
   admin.initializeApp({
