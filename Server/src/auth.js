@@ -1,56 +1,31 @@
-
-import './firebase-init.js';
-import admin from 'firebase-admin';
+// Attaches req.user when Authorization: Bearer <idToken> is present.
+// Never blocks public routes; missing/invalid token -> req.user = null.
+import { auth as adminAuth } from './firebase-init.js';
 
 export async function verifyAuth(req, _res, next) {
   try {
-    const h = req.headers || {};
-    const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
-    const hasBearer = authHeader.startsWith('Bearer ');
+    const header = req.get('authorization') || '';
+    const m = header.match(/^Bearer\s+(.+)$/i);
+    const token = m?.[1];
 
-    console.log('[Auth Debug] Authorization Header:', authHeader);
-    console.log('[Auth Debug] Has Bearer:', hasBearer);
-
-    if (!hasBearer) {
-      // Treat as anonymous for public endpoints; protected routes should check req.user later
-      console.log('[Auth Debug] No Bearer token found');
-      req.user = { uid: 'anon' };
+    if (!token) {
+      req.user = null;
       return next();
     }
 
-    const idToken = authHeader.slice('Bearer '.length).trim();
-    const decoded = await admin.auth().verifyIdToken(idToken);
-
-    // Prefer name in token; fallback to user record/email prefix; then generic
-    let displayName = decoded.name || '';
-    if (!displayName && decoded.uid) {
-      try {
-        const rec = await admin.auth().getUser(decoded.uid);
-        displayName = rec.displayName || (rec.email ? rec.email.split('@')[0] : '');
-      } catch {
-        // ignore
-      }
-    }
-
+    const decoded = await adminAuth.verifyIdToken(token);
     req.user = {
       uid: decoded.uid,
-      displayName: displayName || 'User',
-      email: decoded.email || undefined,
+      displayName:
+        decoded.name ||
+        decoded.email ||
+        (decoded.uid ? `user_${decoded.uid.slice(0, 6)}` : 'user'),
     };
-
     return next();
-  } catch (e) {
-    // Keep failure non-fatal for public endpoints
-    console.warn('verifyAuth failed:', e && e.code ? e.code : e?.message);
-    req.user = { uid: 'anon' };
+  } catch (err) {
+    // Do not hard-fail public endpoints; log and continue as anonymous.
+    console.error('verifyAuth error:', err?.message || err);
+    req.user = null;
     return next();
   }
-}
-
-export function requireAuth(req, res, next) {
-  const uid = req.user?.uid;
-  if (!uid || uid === 'anon') {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  return next();
 }

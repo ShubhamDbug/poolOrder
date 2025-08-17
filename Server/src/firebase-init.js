@@ -1,102 +1,40 @@
-// Server/src/firebase-init.js
+// Robust Admin SDK init that works locally and in production platforms.
 import admin from 'firebase-admin';
-import fs from 'fs';
-import path from 'path';
 
-function loadServiceAccountRaw() {
-  // 1) Full JSON string from env
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) return process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+function loadServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!raw) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is missing');
+  }
 
-  // 2) Path provided via env
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH) {
-    const p = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH;
+  // If it looks like JSON, use it. Otherwise try base64 decode -> JSON.
+  let jsonStr = raw.trim();
+  if (!jsonStr.startsWith('{')) {
     try {
-      if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
-    } catch (e) {
-      console.warn('Failed to read FIREBASE_SERVICE_ACCOUNT_KEY_PATH:', e && e.message);
+      jsonStr = Buffer.from(jsonStr, 'base64').toString('utf8').trim();
+    } catch {
+      /* ignore; will fail on JSON.parse below */
     }
   }
 
-  // 2b) Common Google env var
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const p2 = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    try {
-      if (fs.existsSync(p2)) return fs.readFileSync(p2, 'utf8');
-    } catch (e) {
-      console.warn('Failed to read GOOGLE_APPLICATION_CREDENTIALS path:', e && e.message);
-    }
+  const svc = JSON.parse(jsonStr);
+
+  // Handle platforms that store literal "\n" sequences.
+  if (typeof svc.private_key === 'string') {
+    svc.private_key = svc.private_key.replace(/\\n/g, '\n');
   }
 
-  // 3) Local fallback file inside the repo (Server/FIREBASE_SERVICE_ACCOUNT_KEY.json)
-  try {
-    const fallback = path.resolve(process.cwd(), 'Server', 'FIREBASE_SERVICE_ACCOUNT_KEY.json');
-    if (fs.existsSync(fallback)) return fs.readFileSync(fallback, 'utf8');
-  } catch (e) {
-    // ignore
-  }
-
-  return null;
+  return svc;
 }
 
-function initializeFirebase() {
-  const serviceAccountKeyString = loadServiceAccountRaw();
-
-  if (!serviceAccountKeyString) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set!');
-      process.exit(1);
-    }
-    // In development, allow running without Firebase credentials (useful for CORS/local testing)
-    console.warn('[firebase-admin] FIREBASE_SERVICE_ACCOUNT_KEY not set; skipping initialization in non-production mode.');
-    return;
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKeyString);
-
-    if (typeof serviceAccount.private_key === 'string') {
-      // Convert escaped newlines and normalize CRLF -> LF
-      if (serviceAccount.private_key.includes('\\n')) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-      }
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\r\n/g, '\n').trim();
-    }
-
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
-      });
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[firebase-admin] initialized for project:', serviceAccount.project_id);
-      }
-    }
-
-  // Firebase Admin SDK initialized
-  } catch (e) {
-    console.error('Failed to parse the service account key JSON:', e && e.message);
-    if (process.env.NODE_ENV === 'production') process.exit(1);
-    // In dev, continue without admin but warn.
-    console.warn('[firebase-admin] continuing without initialization in development.');
-  }
+if (!admin.apps.length) {
+  const svc = loadServiceAccount();
+  admin.initializeApp({
+    credential: admin.credential.cert(svc),
+    projectId: svc.project_id, // ensure project is explicit in prod
+  });
 }
 
-// Call the initialization function when the module is imported
-initializeFirebase();
-
-// Only create firestore/auth handles if firebase-admin initialized an app
-let db = null;
-let fbAuth = null;
-
-try {
-  if (admin.apps && admin.apps.length) {
-    db = admin.firestore();
-    fbAuth = admin.auth();
-  }
-} catch (e) {
-  console.warn('[firebase-admin] firestore/auth not available:', e && e.message);
-}
-
-export default admin;
-export { db, fbAuth };
+export const db = admin.firestore();
+export const Timestamp = admin.firestore.Timestamp;
+export const auth = admin.auth();
