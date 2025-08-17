@@ -1,41 +1,81 @@
 // src/lib/api.js
-const BASE_URL = import.meta.env.VITE_API_BASE ;
+import './firebase'; // ensure Firebase app is initialized
+import { getAuth } from 'firebase/auth';
 
+/**
+ * Base URL of the backend, e.g. https://poolorderbackend1.onrender.com
+ * Vite injects env vars with the VITE_ prefix.
+ */
+const BASE_URL = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
+
+/**
+ * Low-level request helper.
+ * - When `authRequired` is true, ensures a fresh Firebase ID token is attached.
+ * - You can also pass an explicit `token` to override (primarily used by ApiContext).
+ * - Public endpoints should leave both `authRequired` and `token` unset.
+ */
 async function request(path, opts = {}) {
   const { method = 'GET', body, token, authRequired = false } = opts;
+
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (authRequired && !token) throw new Error('Auth required');
-  const res = await fetch(`${BASE_URL}${path}`, {
+
+  // Resolve a token if needed
+  let authToken = token ?? null;
+  if (authRequired && !authToken) {
+    const u = getAuth().currentUser;
+    if (u) {
+      // forceRefresh=true to avoid using an expired cached token
+      authToken = await u.getIdToken(true);
+    }
+  }
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  const url = `${BASE_URL}${path}`;
+  const res = await fetch(url, {
     method,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    // If you ever send cookies, keep credentials. Not required for pure bearer tokens.
+    credentials: 'omit',
+    mode: 'cors',
   });
+
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+
   if (!res.ok) {
-    let err = `Request failed (${res.status})`;
-    try { /* parse server error if available */ } catch {}
-    throw new Error(err);
+    const message = (isJson && data && (data.error || data.message)) || res.statusText || 'Request failed';
+    const err = new Error(message);
+    err.status = res.status;
+    err.response = data;
+    throw err;
   }
-  return res.status === 204 ? null : res.json();
+
+  return data;
 }
 
 export const api = {
-  // ✅ add optional excludeUid param (server may ignore; client still filters)
-  nearby: (q) => {
-    const params = new URLSearchParams({
-      lat: String(q.lat),
-      lng: String(q.lng),
-      radiusKm: String(q.radiusKm),
-    });
-    if (q?.excludeUid) params.set('excludeUid', q.excludeUid);
-    return request(`/api/requests/nearby?${params.toString()}`);
+  // Public -------------------------
+  nearby: (params) => {
+    const sp = new URLSearchParams();
+    if (params && typeof params === 'object') {
+      if (params.lat != null) sp.set('lat', String(params.lat));
+      if (params.lng != null) sp.set('lng', String(params.lng));
+      if (params.radiusKm != null) sp.set('radiusKm', String(params.radiusKm));
+    }
+    return request(`/api/requests/nearby?${sp.toString()}`);
   },
 
+  // Protected ----------------------
   createRequest: (body, token) =>
-    request(`/api/requests`, { method: 'POST', body, token, authRequired: true }),
+    request('/api/requests', { method: 'POST', body, token, authRequired: true }),
 
   myRequests: (token) =>
-    request(`/api/requests/mine`, { token, authRequired: true }),
+    request('/api/requests/mine', { token, authRequired: true }),
 
   closeRequest: (id, token) =>
     request(`/api/requests/${id}/close`, { method: 'POST', token, authRequired: true }),
@@ -44,7 +84,7 @@ export const api = {
     request(`/api/requests/${id}`, { method: 'DELETE', token, authRequired: true }),
 
   getRequest: (id, token) =>
-    request(`/api/requests/${id}`, { token }),
+    request(`/api/requests/${id}`, { token, authRequired: true }),
 
   getMyMembership: (id, token) =>
     request(`/api/requests/${id}/membership`, { token, authRequired: true }),

@@ -1,52 +1,59 @@
 // Server/src/auth.js
 // Verifies Firebase ID tokens and attaches req.user = { uid, displayName }
-
 import './firebase-init.js'; // ensure Firebase Admin is initialized
 import admin from 'firebase-admin';
 
 /**
  * verifyAuth
- * - Looks for Authorization: Bearer <idToken>
- * - Verifies with Firebase Admin
- * - Attaches req.user = { uid, displayName }
- * - If token lacks name, fetches user record or uses email prefix
- * - On failure/missing header, treats as anonymous: { uid: 'anon' }
+ * - Non-blocking for public routes: if no header, attaches anon user and continues.
+ * - If Authorization: Bearer <idToken> is present, verifies and attaches user info.
+ * - Never logs the token. Logs only presence for debugging.
  */
 export async function verifyAuth(req, _res, next) {
- 
-  const authHeader = req.headers.authorization || '';
-   console.log(req.headers) ;
-   console.log("This is auth ",req.headers.authorization) ;
-  if (!authHeader.startsWith('Bearer ')) {
-    req.user = { uid: 'anon' };
-    return next();
-  }
-
-  const idToken = authHeader.slice(7);
-
   try {
+    const h = req.headers || {};
+    const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
+    const hasBearer = authHeader.startsWith('Bearer ');
+    const hasSessionCookie = typeof h['cookie'] === 'string' && /__session=/.test(h['cookie']);
+
+    // Safe request log
+    console.log({
+      tag: 'req',
+      method: req.method,
+      path: req.originalUrl || req.url,
+      hasBearer,
+      hasSessionCookie,
+    });
+
+    if (!hasBearer) {
+      // Treat as anonymous for public endpoints; protected routes should check req.user later
+      req.user = { uid: 'anon' };
+      return next();
+    }
+
+    const idToken = authHeader.slice('Bearer '.length).trim();
     const decoded = await admin.auth().verifyIdToken(idToken);
 
-    let displayName = decoded.name;
-    if (!displayName) {
+    // Prefer name in token; fallback to user record/email prefix; then generic
+    let displayName = decoded.name || '';
+    if (!displayName && decoded.uid) {
       try {
-        const userRecord = await admin.auth().getUser(decoded.uid);
-        displayName =
-          userRecord.displayName ||
-          (userRecord.email ? userRecord.email.split('@')[0] : undefined);
+        const rec = await admin.auth().getUser(decoded.uid);
+        displayName = rec.displayName || (rec.email ? rec.email.split('@')[0] : '');
       } catch {
-        // ignore; we'll fallback below
+        // ignore
       }
     }
 
     req.user = {
       uid: decoded.uid,
       displayName: displayName || 'User',
+      email: decoded.email || undefined,
     };
 
     return next();
-  } catch {
-    // Invalid/expired token → anonymous (or change to 401 if you prefer)
+  } catch (e) {
+    console.warn('verifyAuth failed:', e && e.code ? e.code : e?.message);
     req.user = { uid: 'anon' };
     return next();
   }

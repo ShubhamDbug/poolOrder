@@ -1,17 +1,17 @@
-// src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   onAuthStateChanged,
+  GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
-  GoogleAuthProvider,
   signOut as firebaseSignOut,
   type User,
+  type Unsubscribe,
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,            // <-- no newline
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -19,23 +19,24 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Singleton app + auth
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+// Google provider with account chooser
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
-export const listenUser = (setter: (u: User | null) => void) =>
-  onAuthStateChanged(auth, setter);
+export function listenUser(setter: (u: User | null) => void): Unsubscribe {
+  return onAuthStateChanged(auth, setter);
+}
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(): Promise<void> {
   try {
     await signInWithPopup(auth, provider);
-  } catch (err: any) {
-    if (
-      err?.code === 'auth/popup-blocked' ||
-      err?.code === 'auth/operation-not-supported-in-this-environment'
-    ) {
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
       await signInWithRedirect(auth, provider);
       return;
     }
@@ -43,31 +44,22 @@ export async function signInWithGoogle() {
   }
 }
 
-export const signOutNow = () => firebaseSignOut(auth);
-
-export async function idToken(): Promise<string | null> {
-  const u = auth.currentUser;              // currentUser is synchronous
-  if (!u) return null;
-  return await u.getIdToken();
+export async function signOutNow(): Promise<void> {
+  await firebaseSignOut(auth);
 }
 
-// Back-compat names
-export const login = signInWithGoogle;
-export const logout = signOutNow;
-export const getIdToken = idToken;
-export const onAuth = listenUser;
+/** Returns a Firebase ID token string; waits for initial auth state if needed. */
+export async function idToken(forceRefresh = false): Promise<string | null> {
+  if (auth.currentUser) {
+    return auth.currentUser.getIdToken(forceRefresh);
+  }
+  const user = await new Promise<User | null>((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      unsub();
+      resolve(u);
+    });
+  });
+  return user ? user.getIdToken(forceRefresh) : null;
+}
 
-export { auth };
-export type { User };
-
-export default {
-  auth,
-  listenUser,
-  idToken,
-  signInWithGoogle,
-  signOutNow,
-  login,
-  logout,
-  getIdToken,
-  onAuth,
-};
+export { auth, app };

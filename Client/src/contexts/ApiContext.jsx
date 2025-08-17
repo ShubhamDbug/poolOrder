@@ -9,9 +9,10 @@ export function ApiProvider({ children }) {
   const { getIdToken } = useAuth();
 
   const value = React.useMemo(() => ({
+    // Public
     nearby: (params) => api.nearby(params),
 
-    // Protected routes: attach a fresh ID token
+    // Protected routes: attach a fresh ID token per call
     createRequest: async (body) => api.createRequest(body, await getIdToken()),
     myRequests: async () => api.myRequests(await getIdToken()),
     closeRequest: async (id) => api.closeRequest(id, await getIdToken()),
