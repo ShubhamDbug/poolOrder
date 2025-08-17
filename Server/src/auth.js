@@ -13,6 +13,7 @@ export async function verifyAuth(req, _res, next) {
   try {
     const h = req.headers || {};
     const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
+    console.log(authHeader) ;
     const hasBearer = authHeader.startsWith('Bearer ');
     const hasSessionCookie = typeof h['cookie'] === 'string' && /__session=/.test(h['cookie']);
 
