@@ -1,15 +1,28 @@
-// Server/src/firebase-init.js
 import admin from 'firebase-admin';
-import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const require = createRequire(import.meta.url);
-// Keep the file at: Server/serviceAccountKey.json (one level up from /src)
-const serviceAccount = require('../serviceAccountKey.json');
+function loadServiceAccount() {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const candidates = [
+    '/etc/secrets/serviceAccountKey.json',                 // Render Secret File (always)
+    path.resolve(__dirname, '../serviceAccountKey.json'),  // Local dev (your current layout)
+    path.resolve(__dirname, '../../serviceAccountKey.json')// If Render mounts at repo root
+  ];
+  for (const p of candidates) {
+    try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
+  }
+  throw new Error('serviceAccountKey.json not found');
+}
+
+const sa = loadServiceAccount();
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id,
+    credential: admin.credential.cert(sa),
+    projectId: sa.project_id,
   });
 }
 
