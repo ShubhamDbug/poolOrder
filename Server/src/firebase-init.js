@@ -1,52 +1,42 @@
 // Server/src/firebase-init.js
-import fs from 'node:fs';
 import admin from 'firebase-admin';
 
-function loadServiceAccount() {
-  // A. Whole JSON in an env var
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  // B. Base64 of the JSON
-  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-  // C. File path (e.g., Render "Secret File" path)
-  const filePath = process.env.SERVICE_ACCOUNT_PATH;
+function initializeFirebase() {
+  const serviceAccountKeyString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-  let json = null;
-
-  if (raw && raw.trim().startsWith('{')) {
-    json = raw.trim();
-  } else if (b64) {
-    try { json = Buffer.from(b64, 'base64').toString('utf8'); } catch {}
-  } else if (filePath && fs.existsSync(filePath)) {
-    json = fs.readFileSync(filePath, 'utf8');
+  if (!serviceAccountKeyString) {
+    console.error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set!');
+    process.exit(1);
   }
-  if (!json) return null;
 
-  const obj = JSON.parse(json);
-    console.log("OBJ  FOR INIT :: " , obj) ;
+  try {
+    const serviceAccount = JSON.parse(serviceAccountKeyString);
 
-  if (typeof obj.private_key === 'string' && obj.private_key.includes('\\n')) {
-    obj.private_key = obj.private_key.replace(/\\n/g, '\n');
-  }
-  return obj;
-}
+    if (typeof serviceAccount.private_key === 'string' && serviceAccount.private_key.includes('\\n')) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
 
-if (!admin.apps.length) {
-  const serviceAccount = loadServiceAccount();
-  if (!serviceAccount) {
-    throw new Error(
-      'Missing Firebase Admin service account. ' +
-      'Set FIREBASE_SERVICE_ACCOUNT (JSON), FIREBASE_SERVICE_ACCOUNT_BASE64, or SERVICE_ACCOUNT_PATH.'
-    );
-  }
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id, // keep issuer/audience checks aligned
-  });
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id,
+      });
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[firebase-admin] initialized for project:', serviceAccount.project_id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[firebase-admin] initialized for project:', serviceAccount.project_id);
+      }
+    }
+
+    console.log('Firebase Admin SDK initialized successfully.');
+
+  } catch (e) {
+    console.error('Failed to parse the service account key JSON:', e);
+    process.exit(1);
   }
 }
+
+// Call the initialization function when the module is imported
+initializeFirebase();
 
 export default admin;
 export const db = admin.firestore();
