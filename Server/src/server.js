@@ -15,6 +15,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Attach req.user = { uid, displayName } to every request
+app.use(verifyAuth);
+
 app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 // API routes
