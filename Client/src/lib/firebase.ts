@@ -10,6 +10,16 @@ import {
   type Unsubscribe,
 } from 'firebase/auth';
 
+// Debug Firebase config
+console.log('[Firebase Debug] Environment check:', {
+  hasApiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
+  hasAuthDomain: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  hasProjectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  configPresent: !!import.meta.env.VITE_FIREBASE_API_KEY && 
+                 !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN && 
+                 !!import.meta.env.VITE_FIREBASE_PROJECT_ID
+});
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

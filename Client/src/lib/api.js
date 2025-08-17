@@ -99,14 +99,20 @@ async function request(path,
   console.log('[Auth Debug] Final headers:', headers);
   console.log('[Auth Debug] Request URL:', url);
   
+  console.log('[Auth Debug] Making request:', {
+    url,
+    method,
+    hasAuth: !!headers.Authorization,
+    authHeader: headers.Authorization ? `${headers.Authorization.substring(0, 20)}...` : 'none'
+  });
+
   const res = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
+    credentials: 'omit', // Changed from 'include' to 'omit'
     mode: 'cors',
   });
-  console.log("result : " , res) ;
  
 
   const contentType = res.headers.get('content-type') || '';
