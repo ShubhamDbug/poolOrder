@@ -1,17 +1,12 @@
-// Server/src/auth.js
-// Verifies Firebase ID tokens and attaches req.user = { uid, displayName }
-import './firebase-init.js'; // ensure Firebase Admin is initialized
+
+import './firebase-init.js'; 
 import admin from 'firebase-admin';
 
-/**
- * verifyAuth
- * - Non-blocking for public routes: if no header, attaches anon user and continues.
- * - If Authorization: Bearer <idToken> is present, verifies and attaches user info.
- * - Never logs the token. Logs only presence for debugging.
- */
+
 export async function verifyAuth(req, _res, next) {
   try {
     const h = req.headers || {};
+    console.log(h) ;
     const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
     console.log(authHeader) ;
     const hasBearer = authHeader.startsWith('Bearer ');
