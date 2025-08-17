@@ -109,6 +109,7 @@ router.get('/mine', async (req, res) => {
 
 /** GET /api/requests/nearby?lat&lng&radiusKm */
 router.get('/nearby', async (req, res) => {
+    console.log(req) ;
   try {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
