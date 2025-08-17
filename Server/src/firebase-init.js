@@ -3,19 +3,12 @@ import fs from 'node:fs';
 import admin from 'firebase-admin';
 
 function loadServiceAccount() {
-  // A) Plain JSON in env var
+  // A. Whole JSON in an env var
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  // B) Base64-encoded JSON in env var
+  // B. Base64 of the JSON
   const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-  // C) File path to JSON (e.g., Render Secret File)
-  const pathEnv = process.env.SERVICE_ACCOUNT_PATH;
-
-  // Common default for Render Secret File name
-  const defaultPaths = [
-    pathEnv,
-    '/etc/secrets/serviceAccountKey.json',
-    './serviceAccountKey.json',
-  ].filter(Boolean);
+  // C. File path (e.g., Render "Secret File" path)
+  const filePath = process.env.SERVICE_ACCOUNT_PATH;
 
   let json = null;
 
@@ -23,15 +16,8 @@ function loadServiceAccount() {
     json = raw.trim();
   } else if (b64) {
     try { json = Buffer.from(b64, 'base64').toString('utf8'); } catch {}
-  } else {
-    for (const p of defaultPaths) {
-      try {
-        if (p && fs.existsSync(p)) {
-          json = fs.readFileSync(p, 'utf8');
-          break;
-        }
-      } catch { /* ignore */ }
-    }
+  } else if (filePath && fs.existsSync(filePath)) {
+    json = fs.readFileSync(filePath, 'utf8');
   }
 
   if (!json) return null;
@@ -44,21 +30,20 @@ function loadServiceAccount() {
 }
 
 if (!admin.apps.length) {
-  const sa = loadServiceAccount();
-  if (!sa) {
+  const serviceAccount = loadServiceAccount();
+  if (!serviceAccount) {
     throw new Error(
       'Missing Firebase Admin service account. ' +
       'Set FIREBASE_SERVICE_ACCOUNT (JSON), FIREBASE_SERVICE_ACCOUNT_BASE64, or SERVICE_ACCOUNT_PATH.'
     );
   }
-
   admin.initializeApp({
-    credential: admin.credential.cert(sa),
-    projectId: sa.project_id, // keeps token audience/issuer checks aligned
+    credential: admin.credential.cert(serviceAccount),
+    projectId: serviceAccount.project_id, // keep issuer/audience checks aligned
   });
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[firebase-admin] initialized for project:', sa.project_id);
+    console.log('[firebase-admin] initialized for project:', serviceAccount.project_id);
   }
 }
 
