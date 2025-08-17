@@ -7,6 +7,54 @@ import { getAuth } from 'firebase/auth';
  * Vite injects env vars with the VITE_ prefix.
  */
 const BASE_URL = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
+const GEO_CACHE_KEY = 'geo:last';
+
+/** Try browser geolocation, then fall back to a cached last-known location. */
+async function getLocationOrCached() {
+  // 1) Try the Geolocation API first (HTTPS origin required)
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 8000,       // 8s to avoid hanging the UI
+          maximumAge: 600000,  // up to 10 minutes 'fresh' is fine
+        });
+      });
+      const coords = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        source: 'geolocation',
+      };
+      // cache last known good location (non-blocking)
+      try {
+        localStorage.setItem(
+          GEO_CACHE_KEY,
+          JSON.stringify({ lat: coords.lat, lng: coords.lng, ts: Date.now() })
+        );
+      } catch {}
+      return coords;
+    } catch {
+      // swallow and try cache below
+    }
+  }
+
+  // 2) Fallback: use cached last-known coordinates if available
+  try {
+    const raw = localStorage.getItem(GEO_CACHE_KEY);
+    if (raw) {
+      const { lat, lng } = JSON.parse(raw);
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        return { lat, lng, source: 'cache' };
+      }
+    }
+  } catch {}
+
+  // 3) Nothing to use
+  const e = new Error('Location unavailable');
+  e.code = 'GEO_UNAVAILABLE';
+  throw e;
+}
 
 /**
  * Low-level request helper.
@@ -38,7 +86,6 @@ async function request(path, opts = {}) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    // If you ever send cookies, keep credentials. Not required for pure bearer tokens.
     credentials: 'omit',
     mode: 'cors',
   });
@@ -60,13 +107,27 @@ async function request(path, opts = {}) {
 
 export const api = {
   // Public -------------------------
-  nearby: (params) => {
-    const sp = new URLSearchParams();
-    if (params && typeof params === 'object') {
-      if (params.lat != null) sp.set('lat', String(params.lat));
-      if (params.lng != null) sp.set('lng', String(params.lng));
-      if (params.radiusKm != null) sp.set('radiusKm', String(params.radiusKm));
+  /**
+   * Nearby requests. If lat/lng are not provided, we will:
+   *  - try Geolocation API (fast, with 8s timeout)
+   *  - fall back to last cached coordinates (if any)
+   * This prevents the UI from being stuck on “Location not available yet”.
+   */
+  nearby: async (params) => {
+    let { lat, lng, radiusKm } = params || {};
+    if (lat == null || lng == null) {
+      const got = await getLocationOrCached(); // throws only if absolutely unavailable
+      lat = lat ?? got.lat;
+      lng = lng ?? got.lng;
+      // optional: you can log the source without PII
+      // console.log('Nearby using location source:', got.source);
     }
+
+    const sp = new URLSearchParams();
+    sp.set('lat', String(lat));
+    sp.set('lng', String(lng));
+    if (radiusKm != null) sp.set('radiusKm', String(radiusKm));
+
     return request(`/api/requests/nearby?${sp.toString()}`);
   },
 
