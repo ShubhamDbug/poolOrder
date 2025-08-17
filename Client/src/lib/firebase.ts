@@ -11,7 +11,7 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,            // <-- no newline
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -21,6 +21,7 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -31,7 +32,10 @@ export async function signInWithGoogle() {
   try {
     await signInWithPopup(auth, provider);
   } catch (err: any) {
-    if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+    if (
+      err?.code === 'auth/popup-blocked' ||
+      err?.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
       await signInWithRedirect(auth, provider);
       return;
     }
@@ -42,11 +46,11 @@ export async function signInWithGoogle() {
 export const signOutNow = () => firebaseSignOut(auth);
 
 export async function idToken(): Promise<string | null> {
-  const u = await auth.currentUser;
+  const u = auth.currentUser;              // currentUser is synchronous
   if (!u) return null;
   return await u.getIdToken();
 }
-console.log(auth)
+
 // Back-compat names
 export const login = signInWithGoogle;
 export const logout = signOutNow;

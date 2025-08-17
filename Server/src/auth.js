@@ -13,6 +13,20 @@ import admin from 'firebase-admin';
  * - On failure/missing header, treats as anonymous: { uid: 'anon' }
  */
 export async function verifyAuth(req, _res, next) {
+  try{
+    if (process.env.NODE_ENV !== 'production') {
+  const adminProject = require('firebase-admin').app().options.projectId;
+  console.log({
+    tag: 'auth',
+    adminProject,
+    tokenAud: decoded.aud,
+    tokenIss: decoded.iss,
+    uid: decoded.uid,
+  });
+  }
+  }catch(err){
+    console.log("error in veriAuth ", err) ;
+  }
   const authHeader = req.headers.authorization || '';
    console.log(req.headers) ;
    console.log(req.headers.authorization) ;

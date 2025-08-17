@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
     signOut: () => signOutNow(),
     getIdToken: () => idToken(),
   }), [user, loading])
-
+  console.log("id : ",idToken()) ;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
