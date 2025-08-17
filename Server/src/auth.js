@@ -8,8 +8,12 @@ export async function verifyAuth(req, _res, next) {
     const authHeader = (h['authorization'] || h['Authorization'] || '').toString();
     const hasBearer = authHeader.startsWith('Bearer ');
 
+    console.log('[Auth Debug] Authorization Header:', authHeader);
+    console.log('[Auth Debug] Has Bearer:', hasBearer);
+
     if (!hasBearer) {
       // Treat as anonymous for public endpoints; protected routes should check req.user later
+      console.log('[Auth Debug] No Bearer token found');
       req.user = { uid: 'anon' };
       return next();
     }
