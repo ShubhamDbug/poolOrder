@@ -14,7 +14,8 @@ import admin from 'firebase-admin';
  */
 export async function verifyAuth(req, _res, next) {
   const authHeader = req.headers.authorization || '';
-   console.log(authHeader) ;
+   console.log(req.headers) ;
+   console.log(req.headers.authorization) ;
   if (!authHeader.startsWith('Bearer ')) {
     req.user = { uid: 'anon' };
     return next();

@@ -42,11 +42,11 @@ export async function signInWithGoogle() {
 export const signOutNow = () => firebaseSignOut(auth);
 
 export async function idToken(): Promise<string | null> {
-  const u = auth.currentUser;
+  const u = await auth.currentUser;
   if (!u) return null;
   return await u.getIdToken();
 }
-
+console.log(auth)
 // Back-compat names
 export const login = signInWithGoogle;
 export const logout = signOutNow;
