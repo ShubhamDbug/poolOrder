@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.jsx
 import React from 'react'
-import { auth, listenUser, idToken, signInWithGoogle, signOutNow } from '@/lib/firebase'
+import {  listenUser, idToken, signInWithGoogle, signOutNow } from '@/lib/firebase'
 
 export const AuthContext = React.createContext({
   user: null,

@@ -1,5 +1,5 @@
 // src/lib/api.js
-const BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_BASE ;
 
 async function request(path, opts = {}) {
   const { method = 'GET', body, token, authRequired = false } = opts;
