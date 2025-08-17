@@ -19,10 +19,11 @@ function loadServiceAccount() {
   } else if (filePath && fs.existsSync(filePath)) {
     json = fs.readFileSync(filePath, 'utf8');
   }
-
   if (!json) return null;
 
   const obj = JSON.parse(json);
+    console.log("OBJ  FOR INIT :: " , obj) ;
+
   if (typeof obj.private_key === 'string' && obj.private_key.includes('\\n')) {
     obj.private_key = obj.private_key.replace(/\\n/g, '\n');
   }
