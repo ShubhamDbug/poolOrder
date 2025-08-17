@@ -71,19 +71,28 @@ async function request(path,
   // Resolve a token if needed
   let authToken = token ?? null;
   if (authRequired && !authToken) {
-    const u = getAuth().currentUser;
+    const auth = getAuth();
+    const u = auth.currentUser;
+    console.log('[Auth Debug] Current User:', u ? 'exists' : 'null');
     if (u) {
-      // forceRefresh=true to avoid using an expired cached token
-      authToken = await u.getIdToken(true);
+      try {
+        // forceRefresh=true to avoid using an expired cached token
+        authToken = await u.getIdToken(true);
+        console.log('[Auth Debug] Got fresh token:', authToken ? 'yes' : 'no');
+      } catch (e) {
+        console.error('[Auth Debug] Token Error:', e);
+      }
+    } else {
+      console.log('[Auth Debug] No current user in Firebase Auth');
     }
   }
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+    console.log('[Auth Debug] Added token to headers');
+  } else {
+    console.log('[Auth Debug] No token available for request');
   }
-   console.log("methods in api : " , api) ;
-  console.log("body in api " , body) ;
-  console.log("header in api : " , headers) ;
 
   const url = `${BASE_URL}${path}`;
   const res = await fetch(url, {
