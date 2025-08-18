@@ -125,6 +125,7 @@ export default function Nearby() {
           <option value={700}>700 m</option>
           <option value={800}>800 m</option>
           <option value={1000}>1000 m</option>
+          <option value={50000}>50 km(test)</option>
         </select>
       </div>
 
