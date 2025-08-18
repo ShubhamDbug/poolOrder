@@ -1,6 +1,5 @@
 import express from 'express';
 import {
-  hasMembership,
   isOwner,
   listMessages,
   addMessage,
@@ -23,12 +22,6 @@ router.get('/:requestId', async (req, res) => {
       // opportunistic cleanup; non-blocking if you prefer
       await cleanupExpiredRequests(100);
       return res.status(410).json({ error: 'Request expired' });
-    }
-
-    // ✅ owner OR member can read
-    const owner = await isOwner(requestId, uid);
-    if (!owner && !(await hasMembership(requestId, uid))) {
-      return res.status(403).json({ error: 'Join required to view messages' });
     }
 
     const list = await listMessages(requestId);
@@ -55,10 +48,7 @@ router.post('/:requestId', async (req, res) => {
 
     // ✅ owner OR member can send
     const owner = await isOwner(requestId, uid);
-    if (!owner && !(await hasMembership(requestId, uid))) {
-      return res.status(403).json({ error: 'Join required to send messages' });
-    }
-
+  
     if (!text) {
       return res.status(400).json({ error: 'Message text is required' });
     }

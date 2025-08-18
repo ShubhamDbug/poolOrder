@@ -17,6 +17,16 @@ export default function Create() {
   const [loc, setLoc] = React.useState(null)
   const [saving, setSaving] = React.useState(false)
 
+     if(!user){
+    
+     return (
+      <>
+      <p className="text-sm text-gray-500">Sign in to participate.</p>
+      </>
+    )
+    
+    }
+
   React.useEffect(() => {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(

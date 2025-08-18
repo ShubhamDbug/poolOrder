@@ -1,7 +1,7 @@
 // src/lib/api.js
 import './firebase'; // ensure Firebase app is initialized
 import { getAuth } from 'firebase/auth';
-
+import {db} from "./firebase";
 /**
  * Base URL of the backend, e.g. https://poolorderbackend1.onrender.com
  * Vite injects env vars with the VITE_ prefix.

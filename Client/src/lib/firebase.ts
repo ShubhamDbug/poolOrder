@@ -7,19 +7,10 @@ import {
   signInWithRedirect,
   signOut as firebaseSignOut,
   type User,
-  type Unsubscribe,
 } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
-// Debug Firebase config
-console.log('[Firebase Debug] Environment check:', {
-  hasApiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
-  hasAuthDomain: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  hasProjectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  configPresent: !!import.meta.env.VITE_FIREBASE_API_KEY && 
-                 !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN && 
-                 !!import.meta.env.VITE_FIREBASE_PROJECT_ID
-});
-
+// Firebase config from Vite env
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -29,36 +20,20 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Singleton app + auth
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
-// Google provider with account chooser
+// Auth
+const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
-export function listenUser(setter: (u: User | null) => void): Unsubscribe {
-  return onAuthStateChanged(auth, setter);
-}
+// Firestore (new export used by Chat for live updates)
+const db = getFirestore(app);
 
-export async function signInWithGoogle(): Promise<void> {
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err: unknown) {
-    const code = (err as { code?: string })?.code;
-    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
-    throw err;
-  }
-}
+// ---- Auth helpers (kept the same API as before) ----
+export const listenUser = (setter: (u: User | null) => void) =>
+  onAuthStateChanged(auth, setter);
 
-export async function signOutNow(): Promise<void> {
-  await firebaseSignOut(auth);
-}
-
-/** Returns a Firebase ID token string; waits for initial auth state if needed. */
 export async function idToken(forceRefresh = false): Promise<string | null> {
   if (auth.currentUser) {
     return auth.currentUser.getIdToken(forceRefresh);
@@ -72,4 +47,21 @@ export async function idToken(forceRefresh = false): Promise<string | null> {
   return user ? user.getIdToken(forceRefresh) : null;
 }
 
-export { auth, app };
+export async function signInWithGoogle() {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (err: any) {
+    // Fallback for popup blockers and non-popup envs (mobile PWA, etc.)
+    if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    throw err;
+  }
+}
+
+export async function signOutNow() {
+  await firebaseSignOut(auth);
+}
+
+export { app, auth, db };
