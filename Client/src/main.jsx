@@ -10,7 +10,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ApiProvider } from '@/contexts/ApiContext'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
 
 // Pages
 import Nearby from './Pages/Nearby.jsx'
@@ -20,7 +19,6 @@ import Chat from './Pages/Chat.jsx'
 
 createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
-    <ThemeProvider>
       <AuthProvider>
         <ApiProvider>
           <ToastProvider>
@@ -37,6 +35,5 @@ createRoot(document.getElementById('root')).render(
           </ToastProvider>
         </ApiProvider>
       </AuthProvider>
-    </ThemeProvider>
   </ErrorBoundary>
 )
