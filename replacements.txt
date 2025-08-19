@@ -1,2 +1,0 @@
-﻿regex:-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----==[REDACTED_PRIVATE_KEY]
-regex:"private_key"\s*:\s*"-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----\n?"=="\"private_key\":\"[REDACTED_PRIVATE_KEY]\""

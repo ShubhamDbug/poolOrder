@@ -7,6 +7,15 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export default function Mine() {
   const { user } = useAuth()
+  if(!user){
+    
+     return (
+      <>
+      <p className="text-sm text-gray-500">Sign in to participate.</p>
+      </>
+     )
+    
+  }
   const api = useApi()
   const { push } = useToast()
 
