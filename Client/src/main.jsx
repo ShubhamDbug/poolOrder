@@ -28,7 +28,6 @@ createRoot(document.getElementById("root")).render(
             <ToastProvider>
               <App>
                 {/* Runs on every navigation; does nothing unless it's a real reload */}
-                <RefreshRedirect />
                 <Routes>
                   <Route path="/" element={<Nearby />} />
                   <Route path="/create" element={<Create />} />
