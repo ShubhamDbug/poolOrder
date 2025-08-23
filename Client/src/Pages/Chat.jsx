@@ -9,7 +9,6 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '@/lib/firebase'
 
 export default function Chat() {
-  // Hooks — always called, in the same order
   const params = useParams()
   const requestId = params.requestId ?? params.id
 
@@ -21,7 +20,6 @@ export default function Chat() {
   const [text, setText] = React.useState('')
   const [loading, setLoading] = React.useState(true) // start with spinner
 
-  // Polling fallback state (no useCallback)
   const pollTimerRef = React.useRef(null)
   const retryCountRef = React.useRef(0)
 

@@ -13,7 +13,6 @@ export default function Shell({ children }) {
   async function handleSignOut() {
     try { await signOut() } catch (e) { push({ type:'error', message: e?.message || 'Sign-out failed' }) }
   }
-
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
