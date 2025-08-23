@@ -17,6 +17,12 @@ import Create from './Pages/Create.jsx'
 import Mine from './Pages/Mine.jsx'
 import Chat from './Pages/Chat.jsx'
 
+  useEffect(() => {
+    if (performance.getEntriesByType("navigation")[0].type === "reload") {
+      navigate("/your-target-route"); // Example: "/login" or "/home"
+    }
+  }, [navigate]);
+  
 createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
       <AuthProvider>
