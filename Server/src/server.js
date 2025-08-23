@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Ensure Admin SDK is initialized before anything touches Firestore/Auth
 import './firebase-init.js';
@@ -8,14 +10,14 @@ import requestsRoute from './routes/requests.js';
 import messagesRoute from './routes/messages.js';
 import { verifyAuth } from './auth.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 /** ---- CORS (deterministic, supports FRONTALLOWED and Authorization header) ---- */
 const rawAllowed = process.env.FRONTALLOWED || '';
-const allowedList = rawAllowed
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+const allowedList = rawAllowed.split(',').map(s => s.trim()).filter(Boolean);
 
 function isOriginAllowed(origin) {
   if (!origin) return true; // same-origin / curl
@@ -31,9 +33,7 @@ function isOriginAllowed(origin) {
 }
 
 const corsOptions = {
-  origin(origin, cb) {
-    cb(null, isOriginAllowed(origin));
-  },
+  origin(origin, cb) { cb(null, isOriginAllowed(origin)); },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type'],
@@ -67,6 +67,16 @@ app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 /** ---- API routes ---- */
 app.use('/api/requests', requestsRoute);
 app.use('/api/messages', messagesRoute);
+
+/** ---- Serve frontend (static) ---- */
+const publicDir = path.resolve(__dirname, '../client/dist'); // adjust if needed
+app.use(express.static(publicDir));
+
+/** ---- SPA fallback (for /create, /mine, /chat, etc.) ---- */
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next(); // let API 404/error handlers run
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
 
 /** ---- 404 ---- */
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
