@@ -7,9 +7,8 @@ export default function App({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const navEntries = performance.getEntriesByType("navigation");
-    if (navEntries.length && navEntries[0].type === "reload") {
-      navigate("/"); // 👈 change to "/login" or "/home" if you prefer
+    if (performance.getEntriesByType("navigation")[0]?.type === "reload") {
+      navigate("/"); // 👈 always redirect here on refresh
     }
   }, [navigate]);
 
