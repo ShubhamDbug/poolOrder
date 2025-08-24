@@ -8,38 +8,9 @@ import { useToast } from '@/contexts/ToastContext'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-/** ---- helpers: keep message shape consistent & sorted without changing your API contracts ---- */
-function toMillis(v) {
-  if (!v) return 0
-  if (typeof v?.toMillis === 'function') return v.toMillis()               // Firestore Timestamp
-  if (typeof v === 'object' && v.seconds != null)                          // {seconds,nanoseconds}
-    return (v.seconds * 1000) + Math.floor((v.nanoseconds || 0) / 1e6)
-  if (typeof v === 'number') return v                                       // epoch ms
-  if (typeof v === 'string') {                                              // ISO string
-    const t = Date.parse(v)
-    return Number.isNaN(t) ? 0 : t
-  }
-  return 0
-}
-
-function normalizeMsg(m) {
-  const created = m.createdAt ?? m.timestamp ?? m.ts ?? m.time ?? null
-  return {
-    id: m.id || m._id || `${m.uid || 'msg'}-${toMillis(created)}`,
-    uid: m.uid ?? m.userId ?? m.authorId ?? null,
-    displayName: m.displayName ?? m.name ?? m.authorName ?? 'User',
-    text: m.text ?? m.message ?? '',
-    createdAt: created,
-    _sort: toMillis(created),
-  }
-}
-
-function sortAsc(a, b) {
-  return a._sort - b._sort || String(a.id).localeCompare(String(b.id))
-}
-
 export default function Chat() {
   const params = useParams()
+  // Keep exactly your original param logic
   const requestId = params.requestId ?? params.id
 
   const { user, signIn } = useAuth()
@@ -48,32 +19,20 @@ export default function Chat() {
 
   const [messages, setMessages] = React.useState([])
   const [text, setText] = React.useState('')
-  const [loading, setLoading] = React.useState(true)
+  const [loading, setLoading] = React.useState(true) // start with spinner
 
   const pollTimerRef = React.useRef(null)
-  const aliveRef = React.useRef(true)
 
-  // --- sticky-to-bottom refs/state ---
+  // --- Sticky-to-bottom refs/state ---
   const listRef = React.useRef(null)
   const atBottomRef = React.useRef(true)
   const firstLoadRef = React.useRef(true)
-
-  React.useEffect(() => {
-    aliveRef.current = true
-    return () => { aliveRef.current = false }
-  }, [])
-
-  // reset sticky flags when request changes
-  React.useEffect(() => {
-    firstLoadRef.current = true
-    atBottomRef.current = true
-  }, [requestId])
 
   function handleScroll() {
     const el = listRef.current
     if (!el) return
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight
-    atBottomRef.current = distance < 40 // within 40px counts as "at bottom"
+    atBottomRef.current = distance < 40 // near-bottom counts as bottom
   }
 
   function scrollToBottom() {
@@ -82,7 +41,7 @@ export default function Chat() {
     el.scrollTop = el.scrollHeight
   }
 
-  // auto-scroll on new messages if first load OR currently near bottom
+  // Auto-stick on first load and when already near bottom
   React.useLayoutEffect(() => {
     if (firstLoadRef.current || atBottomRef.current) {
       scrollToBottom()
@@ -91,6 +50,13 @@ export default function Chat() {
   }, [messages])
 
   React.useEffect(() => {
+    // Reset sticky flags when request changes
+    firstLoadRef.current = true
+    atBottomRef.current = true
+  }, [requestId])
+
+  React.useEffect(() => {
+    // Cleanup helpers live inside the effect to avoid extra hooks
     function stopPolling() {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current)
@@ -99,65 +65,73 @@ export default function Chat() {
     }
 
     async function fetchOnce() {
+      // EXTRA GUARD so we never hit /api/messages without an id
+      if (!requestId) return
       try {
-        const data = await api.listMessages(requestId) // <== unchanged call shape
-        const list = Array.isArray(data) ? data : []
-        const normalized = list.map(normalizeMsg).sort(sortAsc).map(({ _sort, ...rest }) => rest)
-        if (!aliveRef.current) return
-        setMessages(normalized)
+        const data = await api.listMessages(requestId)
+        setMessages(Array.isArray(data) ? data : [])
         setLoading(false)
-      } catch {
+      } catch (e) {
         // keep spinner until first success; avoid toast spam
+        // console.warn('[chat:poll] listMessages failed:', e?.message || e)
       }
     }
 
     function startPolling() {
       if (pollTimerRef.current) return
-      fetchOnce() // immediate
-      pollTimerRef.current = setInterval(fetchOnce, 3000)
+      fetchOnce() // immediate fetch, then poll
+      pollTimerRef.current = setInterval(fetchOnce, 3000) // 3s cadence
     }
 
-    // reset on request switch
+    // Begin: reset loading and any existing poller
     setLoading(true)
     stopPolling()
 
+    // Guard: if no requestId, just clear and stop
     if (!requestId) {
       setMessages([])
       setLoading(false)
-      return () => stopPolling()
+      return () => {
+        stopPolling()
+      }
     }
 
-    // Firestore realtime (prefer this if rules allow)
+    // Realtime Firestore subscription
     const messagesRef = collection(db, 'requests', String(requestId), 'messages')
-    const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(1000)) // higher cap for long threads
+    // Keep your original cap (200)
+    const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(200))
 
     const unsub = onSnapshot(
       q,
       (snap) => {
-        stopPolling() // got realtime; stop polling
-        const list = snap.docs
-          .map((d) => normalizeMsg({ id: d.id, ...d.data() }))
-          .sort(sortAsc)
-          .map(({ _sort, ...rest }) => rest)
-
-        if (!aliveRef.current) return
+        // Got realtime — ensure we are NOT polling
+        stopPolling()
+        const list = snap.docs.map((d) => {
+          const data = d.data() || {}
+          return {
+            id: d.id,
+            uid: data.uid,
+            displayName: data.displayName,
+            text: data.text,
+          }
+        })
         setMessages(list)
         setLoading(false)
       },
-      // If permission denied / offline, fall back to backend polling
-      () => {
+      (err) => {
+        // If rules reject (permission-denied), or other transient errors:
+        // fall back to backend polling; keep spinner until first successful fetch
+        // console.error('[chat:onSnapshot]', err?.code || err?.message || err)
         startPolling()
       }
     )
 
-    // kick polling too so spinner clears even if snapshot lags
-    startPolling()
-
+    // Cleanup on unmount/request switch
     return () => {
       unsub()
       stopPolling()
     }
-  }, [requestId, api])
+  }, [requestId, api]) // deps kept minimal and stable in most setups
 
   async function send(e) {
     e.preventDefault()
@@ -165,12 +139,10 @@ export default function Chat() {
     const t = text.trim()
     if (!t) return
     try {
-      await api.sendMessage(requestId, t) // <== unchanged call shape
-      setText('') // realtime or poller will reflect it
-      // if user was reading history (scrolled up), don't force-scroll
-      // they'll return to bottom naturally; if they were at bottom, effect will stick it
+      await api.sendMessage(requestId, t)
+      setText('') // realtime or poller will pick it up
     } catch (e) {
-      push({ type: 'error', message: String(e?.message || 'Send failed') })
+      push({ type:'error', message: String(e?.message || 'Send failed') })
     }
   }
 
@@ -186,25 +158,19 @@ export default function Chat() {
         <p className="text-sm text-gray-500">Loading messages…</p>
       ) : (
         <>
-          {/* Scrollable message list that sticks to bottom */}
+          {/* Scrollable list that sticks to bottom unless the user scrolls up */}
           <div
             ref={listRef}
             onScroll={handleScroll}
             className="space-y-2 overflow-y-auto pr-1 border rounded p-2"
-            style={{
-              // sensible default height if parent isn't flexing:
-              maxHeight: '65vh',
-              // if your page shell is flex and should fill, you can swap to: flex: 1
-            }}
+            style={{ maxHeight: '65vh' }}
           >
             {messages.length === 0 ? (
               <p className="text-sm text-gray-500">No messages yet</p>
             ) : (
-              messages.map((m) => (
+              messages.map(m => (
                 <div key={m.id} className="p-2 rounded border">
-                  <div className="text-xs text-gray-500">
-                    {m.displayName || 'User'}
-                  </div>
+                  <div className="text-xs text-gray-500">{m.displayName || 'User'}</div>
                   <div>{m.text}</div>
                 </div>
               ))
@@ -216,13 +182,9 @@ export default function Chat() {
               className="flex-1 px-3 py-2 rounded border"
               placeholder="Type your message…"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={e=>setText(e.target.value)}
             />
-            <button
-              className="px-3 py-2 rounded-lg border"
-              type="submit"
-              disabled={!text.trim()}
-            >
+            <button className="px-3 py-2 rounded-lg border" type="submit" disabled={!text.trim()}>
               Send
             </button>
           </form>
