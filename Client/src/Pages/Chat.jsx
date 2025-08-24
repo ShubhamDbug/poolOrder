@@ -19,7 +19,7 @@ export default function Chat() {
 
   const [messages, setMessages] = React.useState([])
   const [text, setText] = React.useState('')
-  const [loading, setLoading] = React.useState(true) // start with spinner
+  const [loading, setLoading] = React.useState(true)
 
   const pollTimerRef = React.useRef(null)
 
@@ -27,6 +27,11 @@ export default function Chat() {
   const listRef = React.useRef(null)
   const atBottomRef = React.useRef(true)
   const firstLoadRef = React.useRef(true)
+
+  // --- Duplicate/Double-click guards ---
+  const sendingRef = React.useRef(false)       // synchronous guard during the same tick
+  const [sending, setSending] = React.useState(false) // UI disabled state
+  const lastSentRef = React.useRef({ text: '', ts: 0 }) // naive dedupe window
 
   function handleScroll() {
     const el = listRef.current
@@ -56,7 +61,6 @@ export default function Chat() {
   }, [requestId])
 
   React.useEffect(() => {
-    // Cleanup helpers live inside the effect to avoid extra hooks
     function stopPolling() {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current)
@@ -71,9 +75,8 @@ export default function Chat() {
         const data = await api.listMessages(requestId)
         setMessages(Array.isArray(data) ? data : [])
         setLoading(false)
-      } catch (e) {
-        // keep spinner until first success; avoid toast spam
-        // console.warn('[chat:poll] listMessages failed:', e?.message || e)
+      } catch {
+        // keep spinner until first success
       }
     }
 
@@ -91,14 +94,11 @@ export default function Chat() {
     if (!requestId) {
       setMessages([])
       setLoading(false)
-      return () => {
-        stopPolling()
-      }
+      return () => { stopPolling() }
     }
 
     // Realtime Firestore subscription
     const messagesRef = collection(db, 'requests', String(requestId), 'messages')
-    // Keep your original cap (200)
     const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(200))
 
     const unsub = onSnapshot(
@@ -118,10 +118,8 @@ export default function Chat() {
         setMessages(list)
         setLoading(false)
       },
-      (err) => {
-        // If rules reject (permission-denied), or other transient errors:
-        // fall back to backend polling; keep spinner until first successful fetch
-        // console.error('[chat:onSnapshot]', err?.code || err?.message || err)
+      // If rules reject / transient error: fall back to backend polling
+      () => {
         startPolling()
       }
     )
@@ -131,18 +129,37 @@ export default function Chat() {
       unsub()
       stopPolling()
     }
-  }, [requestId, api]) // deps kept minimal and stable in most setups
+  }, [requestId, api])
 
   async function send(e) {
     e.preventDefault()
     if (!user) { await signIn(); return }
+
     const t = text.trim()
     if (!t) return
+
+    // 1) Prevent concurrent sends (click spam / Enter repeat)
+    if (sendingRef.current) return
+
+    // 2) Quick duplicate guard: same text within 2s → ignore
+    const now = Date.now()
+    const { text: lastText, ts: lastTs } = lastSentRef.current
+    if (t === lastText && (now - lastTs) < 2000) {
+      return
+    }
+
     try {
-      await api.sendMessage(requestId, t)
+      sendingRef.current = true
+      setSending(true)
+
+      await api.sendMessage(requestId, t) // unchanged call shape
+      lastSentRef.current = { text: t, ts: now }
       setText('') // realtime or poller will pick it up
     } catch (e) {
-      push({ type:'error', message: String(e?.message || 'Send failed') })
+      push({ type: 'error', message: String(e?.message || 'Send failed') })
+    } finally {
+      sendingRef.current = false
+      setSending(false)
     }
   }
 
@@ -180,12 +197,22 @@ export default function Chat() {
           <form className="flex items-center gap-2" onSubmit={send}>
             <input
               className="flex-1 px-3 py-2 rounded border"
-              placeholder="Type your message…"
+              placeholder={sending ? 'Sending…' : 'Type your message…'}
               value={text}
               onChange={e=>setText(e.target.value)}
+              onKeyDown={e => {
+                // If a send is in-flight, block Enter from re-submitting
+                if (sending && e.key === 'Enter') e.preventDefault()
+              }}
+              disabled={sending}
             />
-            <button className="px-3 py-2 rounded-lg border" type="submit" disabled={!text.trim()}>
-              Send
+            <button
+              className="px-3 py-2 rounded-lg border"
+              type="submit"
+              disabled={sending || !text.trim()}
+              aria-busy={sending ? 'true' : 'false'}
+            >
+              {sending ? 'Sending…' : 'Send'}
             </button>
           </form>
         </>
