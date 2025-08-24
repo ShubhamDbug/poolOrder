@@ -1,157 +1,126 @@
-// src/Pages/Chat.jsx
-import React from 'react'
-import { useParams } from 'react-router-dom'
-import { useApi } from '@/contexts/ApiContext'
-import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
+import React, { useCallback, useEffect, useState } from "react";
+import MessageList from "@/components/MessageList";
+import "@/styles/chat.css"; // optional (safe to remove if not using)
 
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+export default function ChatPage() {
+  const [messages, setMessages] = useState([]);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
-export default function Chat() {
-  const params = useParams()
-  const requestId = params.requestId ?? params.id
+  // Initial page
+  useEffect(() => {
+    (async () => {
+      const res = await listMessages({ before: null, limit: 25 });
+      setMessages(res.items);
+      setHasMoreOlder(!!res.hasMore);
+    })();
+  }, []);
 
-  const { user, signIn } = useAuth()
-  const api = useApi()
-  const { push } = useToast()
-
-  const [messages, setMessages] = React.useState([])
-  const [text, setText] = React.useState('')
-  const [loading, setLoading] = React.useState(true) // start with spinner
-
-  const pollTimerRef = React.useRef(null)
-  const retryCountRef = React.useRef(0)
-
-  React.useEffect(() => {
-    // Cleanup helpers live inside the effect to avoid extra hooks
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-
-    async function fetchOnce() {
-      try {
-        const data = await api.listMessages(requestId)
-        setMessages(Array.isArray(data) ? data : [])
-        setLoading(false)
-      } catch (e) {
-        // keep spinner until first success; avoid toast spam
-        // console.warn('[chat:poll] listMessages failed:', e?.message || e)
-      }
-    }
-
-    function startPolling() {
-      if (pollTimerRef.current) return
-      // immediate fetch, then poll
-      fetchOnce()
-      pollTimerRef.current = setInterval(fetchOnce, 3000) // 3s cadence
-    }
-
-    // Begin: reset loading and any existing poller
-    setLoading(true)
-    stopPolling()
-    retryCountRef.current = 0
-
-    // Guard: if no requestId, just clear and stop
-    if (!requestId) {
-      setMessages([])
-      setLoading(false)
-      return () => {
-        stopPolling()
-      }
-    }
-
-    // Realtime Firestore subscription
-    const messagesRef = collection(db, 'requests', String(requestId), 'messages')
-    const q = query(messagesRef, orderBy('createdAt', 'asc'), limit(200))
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        stopPolling()
-        retryCountRef.current = 0
-        const list = snap.docs.map((d) => {
-          const data = d.data() || {}
-          return {
-            id: d.id,
-            uid: data.uid,
-            displayName: data.displayName,
-            text: data.text,
-          }
-        })
-        setMessages(list)
-        setLoading(false)
-      },
-      (err) => {
-        // If rules reject (permission-denied), or other transient errors:
-        // fall back to backend polling; keep spinner until first successful fetch
-        // console.error('[chat:onSnapshot]', err?.code || err?.message || err)
-        startPolling()
-      }
-    )
-
-    // Cleanup on unmount/request switch
-    return () => {
-      unsub()
-      stopPolling()
-    }
-  }, [requestId, api]) // deps kept minimal and stable in most setups
-
-  async function send(e) {
-    e.preventDefault()
-    if (!user) { await signIn(); return }
-    const t = text.trim()
-    if (!t) return
+  const loadOlder = useCallback(async () => {
+    if (isLoadingOlder || !hasMoreOlder) return;
+    setIsLoadingOlder(true);
     try {
-      await api.sendMessage(requestId, t)
-      setText('') // realtime or poller will pick it up
-    } catch (e) {
-      push({ type:'error', message: String(e?.message || 'Send failed') })
+      const oldest = messages[0]?.createdAt ?? null;
+      const res = await listMessages({ before: oldest, limit: 25 });
+      // Prepend older messages
+      setMessages((prev) => [...res.items, ...prev]);
+      setHasMoreOlder(!!res.hasMore);
+    } finally {
+      setIsLoadingOlder(false);
     }
-  }
+  }, [isLoadingOlder, hasMoreOlder, messages]);
 
-  // No early returns above — hooks already ran.
+  const onSend = useCallback(async (text) => {
+    if (!text.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      const msg = await sendMessage(text.trim());
+      setMessages((prev) => [...prev, msg]);
+    } finally {
+      setIsSending(false);
+    }
+  }, [isSending]);
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Chat</h1>
-
-      {!user && (
-        <p className="text-sm text-gray-500">Sign in to participate.</p>
-      )}
-
-      {loading ? (
-        <p className="text-sm text-gray-500">Loading messages…</p>
-      ) : (
-        <>
-          <div className="space-y-2">
-            {messages.length === 0 ? (
-              <p className="text-sm text-gray-500">No messages yet</p>
-            ) : (
-              messages.map(m => (
-                <div key={m.id} className="p-2 rounded border">
-                  <div className="text-xs text-gray-500">{m.displayName || 'User'}</div>
-                  <div>{m.text}</div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <form className="flex items-center gap-2" onSubmit={send}>
-            <input
-              className="flex-1 px-3 py-2 rounded border"
-              placeholder="Type your message…"
-              value={text}
-              onChange={e=>setText(e.target.value)}
-            />
-            <button className="px-3 py-2 rounded-lg border" type="submit" disabled={!text.trim()}>
-              Send
-            </button>
-          </form>
-        </>
-      )}
+    <div className="h-full flex flex-col">
+      <header className="px-4 py-2 border-b font-medium">Chat</header>
+      <div className="flex-1 min-h-0">
+        <MessageList
+          messages={messages}
+          loadOlder={loadOlder}
+          hasMoreOlder={hasMoreOlder}
+          isLoadingOlder={isLoadingOlder}
+        />
+      </div>
+      <Composer onSend={onSend} isSending={isSending} />
     </div>
-  )
+  );
 }
+
+function Composer({ onSend, isSending }) {
+  const [text, setText] = useState("");
+
+  const submit = useCallback(() => {
+    if (!text.trim()) return;
+    onSend(text);
+    setText("");
+  }, [text, onSend]);
+
+  return (
+    <div className="border-t p-2 flex items-center gap-2">
+      <input
+        className="flex-1 rounded-md border px-3 py-2 text-sm"
+        placeholder="Type a message…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+      />
+      <button
+        onClick={submit}
+        disabled={isSending}
+        className="rounded-md px-3 py-2 text-sm bg-blue-600 text-white disabled:opacity-50"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
+/* ===========================
+   STUB API — replace with your real endpoints
+   =========================== */
+
+async function listMessages({ before = null, limit = 25 } = {}) {
+  // Example: GET /api/messages?before=<ts>&limit=25
+  await sleep(200);
+  const base = before ? Number(before) : Date.now();
+  const items = Array.from({ length: limit }, (_, i) => {
+    const createdAt = base - (limit - i) * 60_000; // 1 minute apart
+    return {
+      id: `${createdAt}`,
+      text: `Message at ${new Date(createdAt).toLocaleTimeString()}`,
+      createdAt,
+      mine: Math.random() < 0.5,
+    };
+  });
+  return { items, hasMore: base > 1000 * 60 * 60 };
+}
+
+async function sendMessage(text) {
+  // Example: POST /api/messages
+  await sleep(150);
+  return {
+    id: `${Date.now()}`,
+    text,
+    createdAt: Date.now(),
+    mine: true,
+  };
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
