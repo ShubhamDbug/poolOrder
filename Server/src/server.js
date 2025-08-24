@@ -1,7 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Ensure Admin SDK is initialized before anything touches Firestore/Auth
 import './firebase-init.js';
@@ -9,9 +7,6 @@ import './firebase-init.js';
 import requestsRoute from './routes/requests.js';
 import messagesRoute from './routes/messages.js';
 import { verifyAuth } from './auth.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -40,23 +35,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 /** ---- Body parsing ---- */
 app.use(express.json());
 
-/** ---- Lightweight request log for debugging token issues ---- */
-app.use((req, _res, next) => {
-  const hasBearer = /^Bearer\s+.+/i.test(req.get('authorization') || '');
-  console.log({
-    tag: 'req',
-    method: req.method,
-    path: req.originalUrl,
-    hasBearer,
-    origin: req.headers.origin,
-  });
-  next();
-});
 
 /** ---- Auth (non-blocking) ---- */
 app.use(verifyAuth);
@@ -68,16 +50,6 @@ app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use('/api/requests', requestsRoute);
 app.use('/api/messages', messagesRoute);
 
-/** ---- Serve frontend (static) ---- */
-// From Server/src -> up to repo root -> Client/dist
-const publicDir = path.resolve(__dirname, '../../Client/dist');
-app.use(express.static(publicDir));
-
-/** ---- SPA fallback (for /create, /mine, /chat, etc.) ---- */
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) return next(); // let API 404/error handlers run
-  res.sendFile(path.join(publicDir, 'index.html'));
-});
 
 /** ---- 404 ---- */
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
