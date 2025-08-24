@@ -2,15 +2,25 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 
+
 export default function RequestCard({ r, rightSlot }) {
-  return (
-    <div className="p-3 rounded-lg border flex items-center justify-between gap-3">
-      <div>
-        <div className="font-medium">{r.item} {r.platform ? <span className="text-xs text-gray-500">({r.platform})</span> : null}</div>
-        {r.distanceKm != null && <div className="text-xs text-gray-500">~{r.distanceKm.toFixed(1)} m away</div>}
-        <span  className="text-sm ">by {r.displayName}</span>
-      </div>
-      {rightSlot || null}
-    </div>
-  )
+return (
+<div className="card p-4 flex items-center justify-between gap-4 hover:shadow-md transition">
+<div className="min-w-0">
+<div className="flex items-center gap-2 flex-wrap">
+<div className="font-medium truncate">{r.item}</div>
+{r.platform ? (
+<span className="chip">{r.platform}</span>
+) : null}
+</div>
+<div className="mt-1 text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+{r.displayName && <span>by {r.displayName}</span>}
+{r.id && (
+<Link to={`/chat/${r.id}`} className="text-indigo-600 hover:text-indigo-700">Open chat →</Link>
+)}
+</div>
+</div>
+{rightSlot || null}
+</div>
+)
 }

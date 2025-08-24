@@ -39,15 +39,6 @@ export default function Mine() {
     return () => { cancelled = true }
   }, [api, push])
 
-  async function closeReq(id) {
-    try {
-      await api.closeRequest(id)
-      setList(prev => prev.map(r => r.id === id ? { ...r, closed: true, status: 'closed' } : r))
-      push({ type: 'success', message: 'Request closed' })
-    } catch {
-      push({ type: 'error', message: 'Failed to close request' })
-    }
-  }
 
   async function delReq(id) {
     try {
@@ -74,12 +65,10 @@ export default function Mine() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{r.item} <span className="text-xs text-gray-500">({r.platform})</span></div>
-                <div className="text-xs text-gray-500">Status: {r.status || (r.closed ? 'closed' : 'open')}</div>
                 {/* ✅ Chat entry per item */}
                 <Link to={`/chat/${r.id}`} className="text-sm underline">Chat</Link>
               </div>
               <div className="flex items-center gap-2">
-                {!r.closed && <button className="px-3 py-1 rounded border" onClick={()=>closeReq(r.id)}>Close</button>}
                 <button className="px-3 py-1 rounded border" onClick={()=>delReq(r.id)} disabled={deletingId===r.id}>
                   {deletingId===r.id ? 'Deleting…' : 'Delete'}
                 </button>

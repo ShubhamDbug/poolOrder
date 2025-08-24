@@ -89,7 +89,7 @@ export default function Nearby() {
     fetchNearby()
 
     // refresh every 7 seconds
-    const id = setInterval(fetchNearby, 7000)
+    const id = setInterval(fetchNearby, 5000)
 
     return () => { cancelled = true; clearInterval(id) }
   }, [loc, radiusM, user?.uid, api, push])
