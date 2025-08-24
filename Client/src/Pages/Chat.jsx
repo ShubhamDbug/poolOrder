@@ -1,5 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
-import MessageList from "../components/MessageList"; // <- relative path, no alias
+import MessageList from "@/components/MessageList";
+
+// ⚠️ Set this from your auth (Clerk/Firebase/etc.)
+const CURRENT_USER_ID = "REPLACE_WITH_AUTH_USER_ID";
+
+// Map server items to include `mine`
+function tagMine(items) {
+  return items.map((m) => ({
+    ...m,
+    mine: m.mine ?? m.senderId === CURRENT_USER_ID,
+  }));
+}
+
+// Merge without duplicates by `id` (falls back to combo key)
+function mergeUnique(left, right) {
+  const keyOf = (m) => m.id ?? m._id ?? `${m.createdAt}-${m.senderId ?? ""}`;
+  const map = new Map(left.map((m) => [keyOf(m), m]));
+  for (const m of right) map.set(keyOf(m), m);
+  return Array.from(map.values());
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([]);
@@ -7,13 +26,15 @@ export default function ChatPage() {
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  // Initial page
+  // Initial load (newest page)
   useEffect(() => {
     (async () => {
       const res = await listMessages({ before: null, limit: 25 });
-      setMessages(res.items);
-      setHasMoreOlder(!!res.hasMore);
+      setMessages(tagMine(res.items));
+      setHasMoreOlder(Boolean(res.hasMore));
     })();
+    // Force light theme in case your app toggled "dark"
+    try { document.documentElement.classList.remove("dark"); } catch {}
   }, []);
 
   const loadOlder = useCallback(async () => {
@@ -22,9 +43,8 @@ export default function ChatPage() {
     try {
       const oldest = messages[0]?.createdAt ?? null;
       const res = await listMessages({ before: oldest, limit: 25 });
-      // Prepend older messages
-      setMessages((prev) => [...res.items, ...prev]);
-      setHasMoreOlder(!!res.hasMore);
+      setMessages((prev) => mergeUnique(tagMine(res.items), prev));
+      setHasMoreOlder(Boolean(res.hasMore));
     } finally {
       setIsLoadingOlder(false);
     }
@@ -35,15 +55,19 @@ export default function ChatPage() {
     setIsSending(true);
     try {
       const msg = await sendMessage(text.trim());
-      setMessages((prev) => [...prev, msg]);
+      const withMine = { ...msg, mine: msg.mine ?? msg.senderId === CURRENT_USER_ID };
+      setMessages((prev) => mergeUnique(prev, [withMine]));
     } finally {
       setIsSending(false);
     }
   }, [isSending]);
 
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-4 py-2 border-b font-medium">Chat</header>
+    <div className="h-full flex flex-col bg-white">
+      <header className="px-4 py-2 border-b font-medium text-gray-900 bg-white">
+        Chat
+      </header>
+
       <div className="flex-1 min-h-0">
         <MessageList
           messages={messages}
@@ -52,6 +76,7 @@ export default function ChatPage() {
           isLoadingOlder={isLoadingOlder}
         />
       </div>
+
       <Composer onSend={onSend} isSending={isSending} />
     </div>
   );
@@ -67,9 +92,9 @@ function Composer({ onSend, isSending }) {
   }, [text, onSend]);
 
   return (
-    <div className="border-t p-2 flex items-center gap-2">
+    <div className="border-t p-2 flex items-center gap-2 bg-white">
       <input
-        className="flex-1 rounded-md border px-3 py-2 text-sm"
+        className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
         placeholder="Type a message…"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -92,34 +117,42 @@ function Composer({ onSend, isSending }) {
 }
 
 /* ===========================
-   STUB API — replace with your real endpoints
+   Real API calls (replace paths if needed)
    =========================== */
 
 async function listMessages({ before = null, limit = 25 } = {}) {
-  // Example: GET /api/messages?before=<ts>&limit=25
-  await sleep(200);
-  const base = before ? Number(before) : Date.now();
-  const items = Array.from({ length: limit }, (_, i) => {
-    const createdAt = base - (limit - i) * 60_000; // 1 minute apart
-    return {
-      id: `${createdAt}`,
-      text: `Message at ${new Date(createdAt).toLocaleTimeString()}`,
-      createdAt,
-      mine: Math.random() < 0.5,
-    };
-  });
-  return { items, hasMore: base > 1000 * 60 * 60 };
-}
+  const qs = new URLSearchParams();
+  if (before !== null && before !== undefined) qs.set("before", String(before));
+  if (limit) qs.set("limit", String(limit));
 
-async function sendMessage(text) {
-  // Example: POST /api/messages
-  await sleep(150);
+  const res = await fetch(`/api/messages?${qs.toString()}`, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`listMessages failed: ${res.status} ${text}`);
+  }
+  // Expected JSON: { items: Message[], hasMore: boolean }
+  const data = await res.json();
   return {
-    id: `${Date.now()}`,
-    text,
-    createdAt: Date.now(),
-    mine: true,
+    items: Array.isArray(data.items) ? data.items : [],
+    hasMore: Boolean(data.hasMore),
   };
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function sendMessage(text) {
+  const res = await fetch(`/api/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`sendMessage failed: ${res.status} ${t}`);
+  }
+  // Expected JSON: { id, text, createdAt, senderId, ... }
+  return await res.json();
+}
