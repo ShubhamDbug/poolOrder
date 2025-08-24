@@ -62,11 +62,12 @@ export default function Nearby() {
     requestLocation()
   }, [requestLocation])
 
-  // Fetch nearby items when we have a location and radius
+  // Fetch nearby items when we have a location and radius + auto-refresh every 7s
   React.useEffect(() => {
     if (!loc) return
     let cancelled = false
-    ;(async () => {
+
+    const fetchNearby = async () => {
       setLoading(true)
       try {
         const radiusKm = radiusM / 1000
@@ -82,8 +83,15 @@ export default function Nearby() {
       } finally {
         if (!cancelled) setLoading(false)
       }
-    })()
-    return () => { cancelled = true }
+    }
+
+    // initial load
+    fetchNearby()
+
+    // refresh every 7 seconds
+    const id = setInterval(fetchNearby, 7000)
+
+    return () => { cancelled = true; clearInterval(id) }
   }, [loc, radiusM, user?.uid, api, push])
 
   // Compute distance (in metres) from user location to each request; memoized for performance
