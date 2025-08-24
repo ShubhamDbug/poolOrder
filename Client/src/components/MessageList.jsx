@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import useChatScroller from "@/hooks/useChatScroller";
+import useChatScroller from "../hooks/useChatScroller";
 
 export default function MessageList({
   messages,

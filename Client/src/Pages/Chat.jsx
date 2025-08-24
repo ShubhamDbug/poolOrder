@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import MessageList from "@/components/MessageList";
-import "@/styles/chat.css"; // optional (safe to remove if not using)
+import MessageList from "../components/MessageList"; // <- relative path, no alias
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([]);
