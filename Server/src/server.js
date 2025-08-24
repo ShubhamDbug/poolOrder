@@ -69,7 +69,8 @@ app.use('/api/requests', requestsRoute);
 app.use('/api/messages', messagesRoute);
 
 /** ---- Serve frontend (static) ---- */
-const publicDir = path.resolve(__dirname, '../client/dist'); // adjust if needed
+// From Server/src -> up to repo root -> Client/dist
+const publicDir = path.resolve(__dirname, '../../dist');
 app.use(express.static(publicDir));
 
 /** ---- SPA fallback (for /create, /mine, /chat, etc.) ---- */
