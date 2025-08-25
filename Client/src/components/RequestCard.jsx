@@ -5,10 +5,10 @@ import { Link } from 'react-router-dom'
 
 export default function RequestCard({ r, rightSlot }) {
 return (
-<div className="card p-4 flex items-center justify-between gap-4 hover:shadow-md transition">
-<div className="min-w-0">
+<div className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:shadow-md transition">
+<div className="min-w-0 flex-1">
 <div className="flex items-center gap-2 flex-wrap">
-<div className="font-medium truncate">{r.item}</div>
+<div className="font-medium break-anywhere">{r.item}</div>
 {r.platform ? (
 <span className="chip">{r.platform}</span>
 ) : null}

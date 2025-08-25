@@ -28,7 +28,7 @@ const linkIdle = 'text-gray-700 hover:bg-gray-100';
 return (
 <div className="min-h-dvh flex flex-col">
 {/* Top bar */}
-<header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+<header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 pt-[env(safe-area-inset-top)]">
 <div className="container-padded h-16 flex items-center justify-between">
 <div className="flex items-center gap-3">
 <div className="size-8 rounded-xl bg-indigo-600"></div>
@@ -69,7 +69,7 @@ return (
 <main className="container-padded py-6 flex-1 w-full">{children}</main>
 
 
-<footer className="border-t py-8">
+<footer className="border-t py-8 pb-[env(safe-area-inset-bottom)]">
 <div className="container-padded text-center text-sm text-gray-500">
 React • Tailwind v4 • Firebase
 </div>

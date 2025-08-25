@@ -1,0 +1,88 @@
+* [33mb78cef3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m P39
+* [33ma61da1b[m P38
+* [33me478175[m P37
+* [33m5b6b268[m P36
+* [33m0daaaa2[m P35
+* [33mda888b7[m P34
+* [33m6e5c740[m P33
+* [33m8f7d94c[m P32
+* [33m2753159[m P31
+* [33m3e6167d[m P30
+* [33mf04efb7[m P29
+* [33m33daef7[m P28
+* [33mc341b7b[m P27
+* [33m3dd6c9f[m P26
+* [33m8f378e9[m P25
+* [33md29a905[m P24
+* [33mcb9a293[m p23
+* [33maf02a91[m P22
+* [33m07e247b[m pushF
+* [33m203b6d5[m tryUpdate
+* [33mf78fdcf[m updateS22
+* [33md8d1db6[m updateNN
+* [33m1c6c091[m updateN
+* [33mdb427e6[m update24
+* [33m85233c8[m update23
+* [33mc42d706[m updateNew
+* [33mf952cd3[m commit22
+*   [33mdbed4f0[m Merge branch 'main' of https://github.com/ShubhamDbug/poolOrder
+[32m|[m[33m\[m  
+[32m|[m * [33m94c7954[m change14
+[32m|[m * [33m11e8250[m change13
+[32m|[m * [33m27969ec[m change 4
+[32m|[m * [33mc65771a[m change3
+[32m|[m * [33m54297e6[m change 12
+[32m|[m * [33m963e4bb[m try113
+[32m|[m * [33m65fd7bb[m 122
+* [33m|[m [33m5dbcd5d[m changes
+[33m|[m[33m/[m  
+* [33m6ba6efa[m try123
+* [33m3ce749e[m tryy1
+* [33m5d5d03a[m tryy
+* [33m834d90a[m try 111
+* [33mfa2fd08[m try 21
+* [33m0484251[m try 13
+* [33m87affa7[m try 12
+* [33m457d0e8[m try5
+* [33ma55e460[m try 11
+* [33m4588756[m try 3
+* [33mbcb5c29[m test 1 s
+* [33m2e419c5[m try fix 1
+* [33m2b720a7[m BackendProb
+* [33m6428d41[m p12
+* [33m00f10db[m p12
+* [33m27a1017[m p11
+* [33m69f7be1[m c177
+* [33mad38c8d[m 122C
+* [33mbba52dc[m c18
+* [33m85dabd2[m c 17
+* [33m6cbfdaa[m c16
+* [33me592540[m c15
+* [33m21ad6bd[m c13
+* [33m4675578[m c12
+* [33m4d43e0a[m c11
+* [33m08f343c[m c10
+* [33mc19bebc[m c7
+* [33mc8b38fd[m commit 5
+* [33md20217e[m c6
+* [33m945e5f4[m backend 12
+* [33m8296083[m BackendJob
+* [33m55cb361[m c1
+* [33m1187499[m commit 4
+* [33mc23e830[m final-setup
+* [33ma923701[m deployment 1
+*   [33m92df129[m Merge pull request #1 from ShubhamDbug/shubham/structure-complete
+[34m|[m[35m\[m  
+[34m|[m * [33md3d85a4[m[33m ([m[1;31morigin/shubham/structure-complete[m[33m, [m[1;32mshubham/structure-complete[m[33m)[m sync1
+[34m|[m * [33m5c46848[m chore: purge secrets from history and ignore
+[34m|[m * [33m7086616[m[33m ([m[1;32mbackup/before-secret-clean[m[33m)[m StructureComplete
+[34m|[m * [33m2a81e84[m update 6
+[34m|[m * [33m254e2cb[m backend 5
+[34m|[m * [33mdb2109f[m Bakend 4
+[34m|[m * [33m9dc1e51[m bakend 3
+[34m|[m[34m/[m  
+* [33m059159b[m backend - 1
+* [33m7a9a448[m frontend3
+* [33m5ebbd35[m frontend2
+* [33mc3f74a6[m React + TailwindSetup
+* [33me5bb24d[m first commit

@@ -143,14 +143,14 @@ export default function Nearby() {
             key={r.id}
             r={r}
             rightSlot={
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-xs text-gray-500">
+              <div className="flex flex-col sm:flex-row sm:items-center items-end gap-2 sm:gap-3 w-full sm:w-auto">
+                <span className="text-xs text-gray-500 order-2 sm:order-1">
                   {loc && typeof r.__distance === 'number'
                     ? formatMetres(r.__distance)
                     : (loc ? '—' : 'Location unavailable')}
                 </span>
                 <button
-                  className="px-3 py-1 rounded border"
+                  className="px-3 py-1 rounded border order-1 sm:order-2 w-full sm:w-auto"
                   onClick={() => navigate(`/chat/${r.id}`)}
                 >
                   Chat
