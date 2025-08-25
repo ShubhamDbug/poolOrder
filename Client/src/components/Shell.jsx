@@ -29,12 +29,10 @@ return (
 <div className="min-h-dvh flex flex-col">
 {/* Top bar */}
 <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 pt-[env(safe-area-inset-top)] w-full">
-  {/* Wrapper: full width, padded */}
   <div className="w-full px-3 sm:px-4">
-    {/* Top bar: logo/brand left, auth right */}
+    {/* top bar */}
     <div className="flex items-center justify-between gap-2 py-2 sm:h-16 sm:py-0">
       <div className="flex items-center gap-3">
-        <div className="size-8 rounded-xl bg-indigo-600" />
         <span className="font-semibold tracking-tight">PoolOrder</span>
       </div>
 
@@ -58,42 +56,50 @@ return (
       </div>
     </div>
 
-    {/* Full-width nav row: 3 equal columns */}
-    <nav className="grid grid-cols-3 gap-2 pb-2 sm:pb-3">
+    {/* full-width nav: equal tabs; icon-only on mobile, icon+text on sm+ */}
+    <nav className="grid grid-cols-3 gap-2 pb-2 sm:pb-3 w-full">
       <NavLink
         to="/"
         end
+        aria-label="Nearby"
         className={({ isActive }) =>
-          `${linkBase} w-full justify-center ${isActive ? linkActive : linkIdle}`
+          `w-full h-10 sm:h-11 flex items-center justify-center gap-0 sm:gap-2 rounded-xl text-xs sm:text-sm ${linkBase} ${
+            isActive ? linkActive : linkIdle
+          }`
         }
       >
-        <Home className="size-4" />
-        <span className="hidden xs:inline">Nearby</span>
+        <Home className="size-5 sm:size-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Nearby</span>
       </NavLink>
 
       <NavLink
         to="/create"
+        aria-label="Create"
         className={({ isActive }) =>
-          `${linkBase} w-full justify-center ${isActive ? linkActive : linkIdle}`
+          `w-full h-10 sm:h-11 flex items-center justify-center gap-0 sm:gap-2 rounded-xl text-xs sm:text-sm ${linkBase} ${
+            isActive ? linkActive : linkIdle
+          }`
         }
       >
-        <Plus className="size-4" />
-        <span className="hidden xs:inline">Create</span>
+        <Plus className="size-5 sm:size-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Create</span>
       </NavLink>
 
       <NavLink
         to="/mine"
+        aria-label="Mine"
         className={({ isActive }) =>
-          `${linkBase} w-full justify-center ${isActive ? linkActive : linkIdle}`
+          `w-full h-10 sm:h-11 flex items-center justify-center gap-0 sm:gap-2 rounded-xl text-xs sm:text-sm ${linkBase} ${
+            isActive ? linkActive : linkIdle
+          }`
         }
       >
-        <User className="size-4" />
-        <span className="hidden xs:inline">Mine</span>
+        <User className="size-5 sm:size-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Mine</span>
       </NavLink>
     </nav>
   </div>
 </header>
-
 
 
 {/* Page content */}
