@@ -29,22 +29,22 @@ return (
 <div className="min-h-dvh flex flex-col">
 {/* Top bar */}
 <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 pt-[env(safe-area-inset-top)]">
-<div className="container-padded h-16 flex items-center justify-between">
+<div className="container-padded flex flex-wrap items-center justify-between gap-2 py-2 sm:h-16 sm:py-0">
 <div className="flex items-center gap-3">
 <div className="size-8 rounded-xl bg-indigo-600"></div>
 <span className="font-semibold tracking-tight">PoolOrder</span>
 </div>
 
 
-<nav className="flex items-center gap-2">
+<nav className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto -mx-1 px-1">
 <NavLink to="/" end className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkIdle}`}>
-<Home className="size-4" /> Nearby
+<Home className="size-4" /> <span className="hidden xs:inline">Nearby</span>
 </NavLink>
 <NavLink to="/create" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkIdle}`}>
-<Plus className="size-4" /> Create
+<Plus className="size-4" /> <span className="hidden xs:inline">Create</span>
 </NavLink>
 <NavLink to="/mine" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkIdle}`}>
-<User className="size-4" /> Mine
+<User className="size-4" /> <span className="hidden xs:inline">Mine</span>
 </NavLink>
 </nav>
 
